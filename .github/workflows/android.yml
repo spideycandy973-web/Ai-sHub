@@ -121,7 +121,9 @@ jobs:
       - name: Collect artifacts
         if: always()
         run: |
+          set -x
           mkdir -p out
+          ( cd android && ./gradlew --no-daemon -q :app:signingReport ) 2>&1 | tee signing-report.txt || true
           find android/app/build/outputs/apk -name '*.apk' -exec cp -v {} out/ \; || true
           ls -lh out || true
           # keep the build log for the artifact so failures are inspectable from the repo
