@@ -2,77 +2,127 @@ name: Build Ai'sHub APK
 
 on:
   push:
-    branches: [main, 'arena/**']
-    paths:
-      - 'src/**'
-      - 'android/**'
-      - 'assets/**'
-      - 'capacitor.config.json'
-      - 'tools/**'
-      - '.github/workflows/android.yml'
+    branches: [main]
   pull_request:
   workflow_dispatch:
 
 permissions:
   contents: write
 
+concurrency:
+  group: apk-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   build:
+    name: Build APK (com.aishub)
     runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
+    timeout-minutes: 30
 
-      - uses: actions/setup-java@v4
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: '21'
 
-      - uses: actions/setup-node@v4
+      - name: Set up Node 22
+        uses: actions/setup-node@v4
         with:
           node-version: '22'
 
-      - uses: android-actions/setup-android@v3
+      # The ubuntu runner image ships the Android SDK. Use it directly; this is
+      # far less fragile than third-party setup actions.
+      - name: Locate the Android SDK
+        run: |
+          set -euo pipefail
+          for candidate in "$ANDROID_HOME" "$ANDROID_SDK_ROOT" /usr/local/lib/android/sdk /opt/android-sdk; do
+            if [ -n "${candidate:-}" ] && [ -d "$candidate" ]; then
+              echo "ANDROID_HOME=$candidate" >> "$GITHUB_ENV"
+              echo "ANDROID_SDK_ROOT=$candidate" >> "$GITHUB_ENV"
+              echo "sdk.dir=$candidate" > android/local.properties
+              echo "Using SDK at $candidate"
+              break
+            fi
+          done
+          if [ -z "${ANDROID_HOME:-}" ]; then echo "::error::No Android SDK found on the runner"; exit 1; fi
+          ls "$ANDROID_HOME/platforms" 2>/dev/null || true
+          ls "$ANDROID_HOME/build-tools" 2>/dev/null || true
+
+      - name: Report toolchain
+        run: |
+          java -version
+          node -v
+          npm -v
+          echo "sdk: ${ANDROID_HOME:-unset}"
 
       - name: Install JS deps
         run: npm install --no-audit --no-fund
 
-      - name: Build web bundle
-        run: npm run build
+      - name: Build the web bundle and inline it into the native project
+        run: |
+          npm run build
+          npx cap copy android
+          test -f android/app/src/main/assets/public/index.html
+          echo "bundled index.html: $(wc -c < android/app/src/main/assets/public/index.html) bytes"
 
-      - name: Copy web assets into the native project
-        run: npx cap copy android
+      - name: Make gradlew executable
+        run: chmod +x android/gradlew
 
       - name: Build debug APK
         working-directory: android
-        run: |
-          chmod +x gradlew
-          ./gradlew --no-daemon assembleDebug
+        run: ./gradlew --no-daemon --stacktrace assembleDebug
 
-      - name: Build release APK (debug-signed)
+      - name: Build release APK (debug-signed, installable)
         working-directory: android
-        run: ./gradlew --no-daemon assembleRelease || echo "release build skipped"
+        run: ./gradlew --no-daemon --stacktrace assembleRelease
 
       - name: Collect artifacts
+        if: always()
         run: |
           mkdir -p out
-          find android/app/build/outputs/apk -name '*.apk' -exec cp {} out/ \;
-          ls -lh out
+          find android/app/build/outputs/apk -name '*.apk' -exec cp -v {} out/ \; || true
+          ls -lh out || true
+          # keep the build log for the artifact so failures are inspectable from the repo
+          (cd android && [ -f app/build/outputs/logs/manifest-merger-debug-report.txt ] && cp app/build/outputs/logs/manifest-merger-debug-report.txt ../out/ || true)
 
-      - uses: actions/upload-artifact@v4
+      - name: Upload APKs
+        if: always()
+        uses: actions/upload-artifact@v4
         with:
           name: AiHub-apk
-          path: out/*.apk
+          path: out/*
           if-no-files-found: warn
+          retention-days: 90
 
       - name: Publish APK to the "builds" release
-        if: github.event_name == 'push'
+        if: github.event_name == 'push' && success()
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
+          set -euo pipefail
           tag=builds
           gh release view "$tag" >/dev/null 2>&1 || gh release create "$tag" \
             --title "Ai'sHub builds" \
-            --notes "Auto-built APKs from the latest commit. Package: com.aishub"
-          for f in out/*.apk; do
-            [ -f "$f" ] && gh release upload "$tag" "$f" --clobber
+            --notes "Installable APKs built automatically from \`$GITHUB_REF_NAME\`.
+
+          **Package:** \`com.aishub\` · **App:** Ai'sHub
+
+          Download the APK, allow install from unknown sources, open it. No account needed; the app works offline." 
+          shopt -s nullglob
+          apks=(out/*.apk)
+          if [ ${#apks[@]} -eq 0 ]; then echo "::error::No APK produced"; exit 1; fi
+          for f in "${apks[@]}"; do
+            base=$(basename "$f")
+            case "$base" in
+              *release*) name="AisHub-$(node -p "require('./package.json').version")-release.apk" ;;
+              *) name="AisHub-$(node -p "require('./package.json').version")-debug.apk" ;;
+            esac
+            cp "$f" "out/$name"
+            gh release upload "$tag" "out/$name" --clobber
+            echo "uploaded $name"
           done
+          gh release view "$tag" --json assets -q '.assets[].name'
