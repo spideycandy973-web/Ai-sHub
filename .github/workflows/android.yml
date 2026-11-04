@@ -252,6 +252,10 @@ jobs:
           **Package:** \`com.aishub\` · **App:** Ai'sHub
 
           Download \`AisHub-<version>-release.apk\` (smaller) or \`-debug.apk\`, allow install from unknown sources, open it. No account needed; the app works offline." 
+          echo "=== OUT CONTENTS ==="; ls -l out
+          echo "=== apksigner probe ==="
+          BT=$(ls -d "$ANDROID_HOME/build-tools/"* | sort -V | tail -1)
+          for f in out/*.apk; do echo "--- $f"; "$BT/apksigner" verify --print-certs "$f" 2>&1 | head -6 || true; done
           shopt -s nullglob
           if ls out/*unsig* >/dev/null 2>&1; then
             echo "::error::Refusing to publish: the release APK is unsigned and cannot be installed"
