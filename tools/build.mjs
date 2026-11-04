@@ -17,7 +17,7 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const SRC = path.join(root, 'src');
 const BUILD_ID = (process.env.BUILD_ID || new Date().toISOString().slice(0, 10));
 const VERSION = JSON.parse(await readFile(path.join(root, 'package.json'), 'utf8')).version;
-const CACHE = `aishub-${VERSION}-${Date.now().toString(36).slice(-5)}`;
+// deterministic cache name (content rev) so repeat builds are byte-identical
 
 async function walk(dir, base = dir) {
   const out = [];
@@ -90,6 +90,7 @@ const ASSETS = [
 async function main() {
   const html = await inlineHtml();
   const rev = await fingerprint(html);
+  const CACHE = `aishub-${VERSION}-${rev}`;
 
   const outputs = [path.join(root, 'docs'), path.join(root, 'dist')];
   for (const out of outputs) {
@@ -111,12 +112,12 @@ async function main() {
       .replaceAll('__REV__', rev)
       .replaceAll('__SHELL__', JSON.stringify(['./', './index.html', ...ASSETS.map(([n]) => './' + n)]));
     await writeFile(path.join(out, 'sw.js'), sw, 'utf8');
-    await writeFile(path.join(out, 'offline.json'), JSON.stringify({ rev, built: new Date().toISOString(), version: VERSION }, null, 2));
+    await writeFile(path.join(out, 'offline.json'), JSON.stringify({ rev, version: VERSION, build: BUILD_ID }, null, 2));
     await writeFile(path.join(out, '.nojekyll'), '');
   }
 
   const size = (await stat(path.join(root, 'docs', 'index.html'))).size;
-  console.log(`[build] Ai'sHub v${VERSION} rev ${rev} -> docs/ + dist/ (index.html ${(size / 1024).toFixed(0)} kB, cache ${CACHE})`);
+  console.log(`[build] Ai'sHub v${VERSION} rev ${rev} -> docs/ + dist/ (index.html ${(size / 1024).toFixed(0)} kB, cache aishub-${VERSION}-${rev})`);
 }
 
 main().catch((err) => {
