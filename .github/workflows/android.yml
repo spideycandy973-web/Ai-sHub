@@ -51,6 +51,8 @@ jobs:
           if [ -z "${ANDROID_HOME:-}" ]; then echo "::error::No Android SDK found on the runner"; exit 1; fi
           ls "$ANDROID_HOME/platforms" 2>/dev/null || true
           ls "$ANDROID_HOME/build-tools" 2>/dev/null || true
+          echo "SDK located: $ANDROID_HOME" >> sdk-check.txt
+          java -version 2>> sdk-check.txt || true
 
       - name: Report toolchain
         run: |
@@ -115,6 +117,44 @@ jobs:
           path: out/*
           if-no-files-found: warn
           retention-days: 90
+
+
+      - name: Report build logs to the log branch
+        if: always()
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -x
+          LOG_BRANCH="ci-logs"
+          digest="errors.txt"
+          [ -f "$digest" ] || echo "no errors.txt was produced" > "$digest"
+          {
+            echo "run: $GITHUB_RUN_ID | job: $GITHUB_JOB | ref: $GITHUB_REF_NAME"
+            echo "conclusion of the build step is shown in the workflow summary"
+            echo
+            echo "===== errors.txt (first 60 matching lines) ====="
+            head -n 60 "$digest" 2>/dev/null || true
+            echo
+            echo "===== What went wrong ====="
+            sed -n '/What went wrong/,/^\*/p' gradle-debug.log 2>/dev/null | head -60 || true
+            echo
+            echo "===== tail of gradle-debug.log ====="
+            tail -n 120 gradle-debug.log 2>/dev/null || echo "no gradle-debug.log produced (failed before Gradle ran)"
+            echo
+            echo "===== sdk-check ====="
+            cat sdk-check.txt 2>/dev/null || true
+          } > ci-log.txt
+
+          git config user.name "aishub-ci"
+          git config user.email "ci@users.noreply.github.com"
+          git checkout --orphan "$LOG_BRANCH" 2>/dev/null || git checkout "$LOG_BRANCH"
+          git rm -r --cached . >/dev/null 2>&1 || true
+          rm -f ci-report.md
+          cp ci-log.txt ci-report.md
+          git add -f ci-report.md sdk-check.txt 2>/dev/null || git add -f ci-report.md
+          git commit -m "ci: build log for run $GITHUB_RUN_ID" --no-verify || echo "nothing to commit"
+          git push -f origin "$LOG_BRANCH" && echo "pushed log to $LOG_BRANCH"
 
       - name: Diagnose failure (if the build failed)
         if: failure()
