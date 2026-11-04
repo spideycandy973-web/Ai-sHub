@@ -16,11 +16,29 @@ android {
             ignoreAssetsPattern = '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
         }
     }
+    signingConfigs {
+        // Keeps `assembleRelease` producing an *installable* APK with no extra
+        // CI secrets. CI materialises aishub-release.jks and stores it on the
+        // `signing` branch so every build updates the same app.
+        release {
+            if (rootProject.file('aishub-release.jks').exists()) {
+                storeFile rootProject.file('aishub-release.jks')
+                storePassword 'aishub-release'
+                keyAlias 'aishub'
+                keyPassword 'aishub-release'
+            } else {
+                storeFile file(System.getProperty('user.home') + '/.android/debug.keystore')
+                storePassword 'android'
+                keyAlias 'androiddebugkey'
+                keyPassword 'android'
+            }
+        }
+    }
     buildTypes {
         release {
-            // signed with a debug-style keystore unless you provide your own release signing config
             minifyEnabled false
             shrinkResources false
+            signingConfig signingConfigs.release
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
         }
     }

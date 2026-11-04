@@ -33,12 +33,16 @@ const escapeHtmlAttr = (s) => s.replace(/&/g, '&amp;').replace(/"/g, '&quot;').r
 
 async function inlineHtml() {
   let html = await readFile(path.join(SRC, 'index.html'), 'utf8');
-  const includeRe = /^([ \t]*)<!--\s*@include\s+([^\s>]+)\s*-->[ \t]*$/gm;
+  // Supports BOTH marker styles, because CSS files need a CSS-comment marker:
+  //   <!-- @include js/app.js -->      (markup context)
+  //   /* @include css/base.css */      (inside a <style> block)
+  const includeRe = /^([ \t]*)(?:<!--\s*@include\s+([^\s>]+?)\s*-->|\/\*\s*@include\s+([^\s*>]+?)\s*\*\/)[ \t]*$/gm;
   const parts = [];
   let last = 0;
   let m;
   while ((m = includeRe.exec(html))) {
-    const [full, indent, rel] = m;
+    const [full, indent, htmlRel, cssRel] = m;
+    const rel = htmlRel || cssRel;
     const file = path.join(SRC, rel);
     if (!existsSync(file)) throw new Error(`@include target missing: ${rel}`);
     parts.push(html.slice(last, m.index));
@@ -56,6 +60,19 @@ async function inlineHtml() {
   }
   parts.push(html.slice(last));
   html = parts.join('');
+
+  // Never ship a shell that still contains build markers: that means CSS/JS was
+  // silently dropped, which produces an unstyled, dead-looking app on device.
+  const leftover = html.match(/^.*@include.*$/gm);
+  if (leftover) {
+    throw new Error(`unresolved @include markers left in the output:\n  ${leftover.join('\n  ')}`);
+  }
+  if (!/<style>[\s\S]{500,}<\/style>/.test(html)) {
+    throw new Error('no substantial CSS was inlined — the stylesheet marker syntax is probably wrong');
+  }
+  if (!/<script>[\s\S]{500,}<\/script>/.test(html)) {
+    throw new Error('no substantial JS was inlined — the script marker syntax is probably wrong');
+  }
 
   html = html
     .replaceAll('__APP_VERSION__', VERSION)

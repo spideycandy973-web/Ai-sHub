@@ -269,3 +269,21 @@ test('provider key storage round-trips and never leaves the device', () => {
   A.settings.setKey('groq', '');
   assert.equal(A.settings.hasKey('groq'), false);
 });
+
+/* ── regression: the shipped shell must actually contain its CSS and JS ──
+   A build that leaves @include markers un-inlined ships an unstyled app whose
+   composer sits off-screen, which looks exactly like "the AI is not responding". */
+test('the shipped shell inlines real CSS and JS (no unresolved markers)', () => {
+  const html = fs.readFileSync(HTML_PATH, 'utf8');
+  assert.equal(html.includes('@include'), false, 'no @include markers may survive the build');
+
+  const styleText = [...html.matchAll(/<style>([\s\S]*?)<\/style>/g)].map((m) => m[1]).join('\n');
+  const scriptText = [...html.matchAll(/<script>([\s\S]*?)<\/script>/g)].map((m) => m[1]).join('\n');
+  assert.ok(styleText.length > 20000, `CSS must be inlined (got ${styleText.length} chars)`);
+  assert.ok(scriptText.length > 100000, `JS must be inlined (got ${scriptText.length} chars)`);
+
+  // the rules the layout depends on, spot-checked by name
+  for (const sel of ['.tabbar', '.composer-wrap', '.screen', '.main', '.welcome', '.msg']) {
+    assert.ok(styleText.includes(sel), `stylesheet is missing the ${sel} rule`);
+  }
+});
