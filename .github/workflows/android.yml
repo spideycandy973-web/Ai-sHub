@@ -243,6 +243,13 @@ jobs:
           [ -f "$digest" ] || echo "no errors.txt was produced" > "$digest"
           {
             echo "run: $GITHUB_RUN_ID | job: $GITHUB_JOB | ref: $GITHUB_REF_NAME"
+            echo
+            echo "===== publish.log ====="
+            cat publish.log 2>/dev/null || echo "(no publish.log — publish step did not run)"
+            echo
+            echo "===== out/ ====="
+            ls -la out 2>/dev/null || true
+            echo
             echo "conclusion of the build step is shown in the workflow summary"
             echo
             echo "===== errors.txt (first 60 matching lines) ====="
