@@ -1,0 +1,23 @@
+{
+  "name": "Ai'sHub — AI Agent & 100+ Models",
+  "short_name": "Ai'sHub",
+  "description": "Offline-first AI assistant and agent with 100+ models, auto model discovery and skills. Free, yours, unlimited.",
+  "id": "/Ai-sHub/",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "display_override": ["standalone", "minimal-ui"],
+  "orientation": "portrait-primary",
+  "background_color": "#07070B",
+  "theme_color": "#07070B",
+  "categories": ["productivity", "utilities"],
+  "icons": [
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ],
+  "shortcuts": [
+    { "name": "New chat", "url": "./?action=new-chat" },
+    { "name": "Agent mode", "url": "./?action=agent" }
+  ]
+}
