@@ -193,6 +193,37 @@ jobs:
           sed -n '/What went wrong/,/^\*/p' gradle-debug.log 2>/dev/null | head -40 || true
           grep -iE 'Could not (find|resolve)|Unsupported class|requires Gradle|SDK location|license' gradle-debug.log 2>/dev/null | head -20 || true
 
+      - name: Verify the APK really contains the working app
+        if: success()
+        run: |
+          set -euo pipefail
+          APK=$(find out -name '*-release.apk' | head -1)
+          echo "verifying $APK"
+          BT=$(ls -d "$ANDROID_HOME/build-tools/"* | sort -V | tail -1)
+
+          PKG=$("$BT/aapt2" dump badging "$APK" | sed -n "s/^package: name='\\([^']*\\)'.*/\\1/p")
+          echo "package id: $PKG"
+          [ "$PKG" = "com.aishub" ] || { echo "::error::package is '$PKG', expected com.aishub"; exit 1; }
+
+          "$BT/apksigner" verify "$APK" || { echo "::error::APK signature does not verify"; exit 1; }
+
+          unzip -p "$APK" assets/public/index.html > bundled.html
+          [ -s bundled.html ] || { echo "::error::APK contains no bundled web app"; exit 1; }
+          node -e '
+            const fs = require("fs");
+            const h = fs.readFileSync("bundled.html", "utf8");
+            const css = [...h.matchAll(/<style>([\s\S]*?)<\/style>/g)].map(m => m[1]).join("");
+            const js  = [...h.matchAll(/<script>([\s\S]*?)<\/script>/g)].map(m => m[1]).join("");
+            console.log(`APK bundle: ${h.length} bytes | css ${css.length} chars | js ${js.length} chars | @include ${h.split("@include").length - 1}`);
+            const fail = (m) => { console.error("::error::" + m); process.exit(1); };
+            if (h.includes("@include")) fail("APK ships unresolved @include markers");
+            if (css.length < 20000) fail("APK ships a nearly empty stylesheet (unstyled app)");
+            if (js.length < 100000) fail("APK ships a truncated script bundle");
+            for (const sel of [".tabbar", ".composer-wrap", ".screen"]) {
+              if (!css.includes(sel)) fail(`APK stylesheet lacks the ${sel} rule`);
+            }
+          '
+
       - name: Publish APK to the "builds" release
         if: success() && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
         env:
