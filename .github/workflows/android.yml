@@ -148,6 +148,13 @@ jobs:
             echo "===== merged values.xml (resource compile input) ====="
             head -c 4000 android/app/build/intermediates/incremental/debug/mergeDebugResources/merged.dir/values/values.xml 2>/dev/null || echo "(not produced)"
             echo
+            echo "===== apk verification ====="
+            [ -f apk-info.txt ] && cat apk-info.txt || echo "(no apk-info.txt)"
+            [ -f apk-signature.txt ] && head -12 apk-signature.txt || echo "(no apk-signature.txt)"
+            [ -f apk-contents.txt ] && cat apk-contents.txt || echo "(no apk-contents.txt)"
+            echo "--- out/ ---"
+            ls -lh out 2>/dev/null || true
+            echo
             echo "===== every values resource file ====="
             find android/app/src/main/res/values android/capacitor-cordova-android-plugins/src/main/res -type f 2>/dev/null | while read -r f; do
               echo "--- $f"; cat "$f"; echo
@@ -182,7 +189,11 @@ jobs:
           echo "build-tools: $BT"
 
           # 1. package id + version, straight from the manifest
-          "$BT/aapt2" dump badging "$APK" | grep -E "^package:|^application-label|^sdkVersion|^targetSdkVersion" | tee apk-info.txt
+          "$BT/aapt2" dump badging "$APK" 2>&1 | grep -E "^package:|^application-label|^sdkVersion|^targetSdkVersion" | tee apk-info.txt || true
+          echo "--- aapt2 path probe ---"
+          ls "$BT" | head -20
+          echo "--- badging head ---"
+          "$BT/aapt2" dump badging "$APK" 2>&1 | head -5 || true
           PKG=$("$BT/aapt2" dump badging "$APK" | sed -n "s/^package: name='\([^']*\)'.*/\1/p")
           echo "package: $PKG"
           [ "$PKG" = "com.aishub" ] || { echo "::error::package is '$PKG', expected com.aishub"; exit 1; }
