@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Ai\'sHub</string>
+    <string name="title_activity_main">Ai\'sHub</string>
+    <string name="package_name">com.aishub</string>
+    <string name="custom_url_scheme">com.aishub</string>
+</resources>

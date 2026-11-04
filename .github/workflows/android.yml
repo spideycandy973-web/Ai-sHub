@@ -1,0 +1,201 @@
+name: Build Ai'sHub APK
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: apk-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build APK (com.aishub)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Set up Node 22
+        uses: actions/setup-node@v5
+        with:
+          node-version: '22'
+
+      # The ubuntu runner image ships the Android SDK. Use it directly; this is
+      # far less fragile than third-party setup actions.
+      - name: Locate the Android SDK
+        run: |
+          set -euo pipefail
+          for candidate in "$ANDROID_HOME" "$ANDROID_SDK_ROOT" /usr/local/lib/android/sdk /opt/android-sdk; do
+            if [ -n "${candidate:-}" ] && [ -d "$candidate" ]; then
+              echo "ANDROID_HOME=$candidate" >> "$GITHUB_ENV"
+              echo "ANDROID_SDK_ROOT=$candidate" >> "$GITHUB_ENV"
+              echo "sdk.dir=$candidate" > android/local.properties
+              echo "Using SDK at $candidate"
+              break
+            fi
+          done
+          if [ -z "${ANDROID_HOME:-}" ]; then echo "::error::No Android SDK found on the runner"; exit 1; fi
+          ls "$ANDROID_HOME/platforms" 2>/dev/null || true
+          ls "$ANDROID_HOME/build-tools" 2>/dev/null || true
+          echo "SDK located: $ANDROID_HOME" >> sdk-check.txt
+          java -version 2>> sdk-check.txt || true
+
+      - name: Report toolchain
+        run: |
+          java -version
+          node -v
+          npm -v
+          echo "sdk: ${ANDROID_HOME:-unset}"
+
+      - name: Install JS deps
+        run: npm install --no-audit --no-fund
+
+      - name: Build the web bundle and inline it into the native project
+        run: |
+          npm run build
+          npx cap copy android
+          test -f android/app/src/main/assets/public/index.html
+          echo "bundled index.html: $(wc -c < android/app/src/main/assets/public/index.html) bytes"
+
+      - name: Make gradlew executable
+        run: chmod +x android/gradlew
+
+      - name: Build debug APK
+        working-directory: android
+        env:
+          GRADLE_OPTS: '-Dorg.gradle.jvmargs=-Xmx3g'
+        run: |
+          set -o pipefail
+          # Tee the Gradle output so the failure reason survives the run and
+          # shows up in the uploaded artifact (run logs are not always reachable).
+          ./gradlew --no-daemon --stacktrace --warning-mode all assembleDebug 2>&1 | tee ../gradle-debug.log
+          code=${PIPESTATUS[0]}
+          if [ "$code" -ne 0 ]; then
+            echo "::error::Gradle failed with exit code $code"
+            echo '----- last 120 lines -----'
+            tail -n 120 ../gradle-debug.log | sed 's/^/  /'
+            exit "$code"
+          fi
+
+      - name: Build release APK (debug-signed, installable)
+        working-directory: android
+        run: ./gradlew --no-daemon --stacktrace assembleRelease 2>&1 | tee ../gradle-release.log || true
+
+      - name: Collect artifacts
+        if: always()
+        run: |
+          mkdir -p out
+          find android/app/build/outputs/apk -name '*.apk' -exec cp -v {} out/ \; || true
+          ls -lh out || true
+          # keep the build log for the artifact so failures are inspectable from the repo
+          cp gradle-debug.log out/ 2>/dev/null || true
+          cp gradle-release.log out/ 2>/dev/null || true
+          # error-only digest: tiny, greppable from the repo
+          grep -iE 'error|FAILURE|Could not|Caused by|what went wrong' gradle-debug.log 2>/dev/null | head -n 60 > out/errors.txt || true
+          echo '--- errors.txt ---'
+          cat out/errors.txt 2>/dev/null || true
+
+      - name: Upload APKs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: AiHub-apk
+          path: out/*
+          if-no-files-found: warn
+          retention-days: 90
+
+
+      - name: Report build logs to the log branch
+        if: always()
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -x
+          LOG_BRANCH="ci-logs"
+          digest="errors.txt"
+          [ -f "$digest" ] || echo "no errors.txt was produced" > "$digest"
+          {
+            echo "run: $GITHUB_RUN_ID | job: $GITHUB_JOB | ref: $GITHUB_REF_NAME"
+            echo "conclusion of the build step is shown in the workflow summary"
+            echo
+            echo "===== errors.txt (first 60 matching lines) ====="
+            head -n 60 "$digest" 2>/dev/null || true
+            echo
+            echo "===== What went wrong ====="
+            sed -n '/What went wrong/,/^\*/p' gradle-debug.log 2>/dev/null | head -60 || true
+            echo
+            echo "===== tail of gradle-debug.log ====="
+            tail -n 120 gradle-debug.log 2>/dev/null || echo "no gradle-debug.log produced (failed before Gradle ran)"
+            echo
+            echo "===== sdk-check ====="
+            cat sdk-check.txt 2>/dev/null || true
+            echo
+            echo "===== merged values.xml (resource compile input) ====="
+            head -c 4000 android/app/build/intermediates/incremental/debug/mergeDebugResources/merged.dir/values/values.xml 2>/dev/null || echo "(not produced)"
+            echo
+            echo "===== every values resource file ====="
+            find android/app/src/main/res/values android/capacitor-cordova-android-plugins/src/main/res -type f 2>/dev/null | while read -r f; do
+              echo "--- $f"; cat "$f"; echo
+            done | head -c 6000
+          } > ci-log.txt
+
+          git config user.name "aishub-ci"
+          git config user.email "ci@users.noreply.github.com"
+          git checkout --orphan "$LOG_BRANCH" 2>/dev/null || git checkout "$LOG_BRANCH"
+          git rm -r --cached . >/dev/null 2>&1 || true
+          rm -f ci-report.md
+          cp ci-log.txt ci-report.md
+          git add -f ci-report.md sdk-check.txt 2>/dev/null || git add -f ci-report.md
+          git commit -m "ci: build log for run $GITHUB_RUN_ID" --no-verify || echo "nothing to commit"
+          git push -f origin "$LOG_BRANCH" && echo "pushed log to $LOG_BRANCH"
+
+      - name: Diagnose failure (if the build failed)
+        if: failure()
+        run: |
+          echo "::error::Gradle failed — see the AiHub-apk artifact (errors.txt / gradle-debug.log)"
+          sed -n '/What went wrong/,/^\*/p' gradle-debug.log 2>/dev/null | head -40 || true
+          grep -iE 'Could not (find|resolve)|Unsupported class|requires Gradle|SDK location|license' gradle-debug.log 2>/dev/null | head -20 || true
+
+      - name: Publish APK to the "builds" release
+        if: github.event_name == 'push' && success()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          tag=builds
+          gh release view "$tag" >/dev/null 2>&1 || gh release create "$tag" \
+            --title "Ai'sHub builds" \
+            --notes "Installable APKs built automatically from \`$GITHUB_REF_NAME\`.
+
+          **Package:** \`com.aishub\` · **App:** Ai'sHub
+
+          Download the APK, allow install from unknown sources, open it. No account needed; the app works offline." 
+          shopt -s nullglob
+          apks=(out/*.apk)
+          if [ ${#apks[@]} -eq 0 ]; then echo "::error::No APK produced"; exit 1; fi
+          for f in "${apks[@]}"; do
+            base=$(basename "$f")
+            case "$base" in
+              *release*) name="AisHub-$(node -p "require('./package.json').version")-release.apk" ;;
+              *) name="AisHub-$(node -p "require('./package.json').version")-debug.apk" ;;
+            esac
+            cp "$f" "out/$name"
+            gh release upload "$tag" "out/$name" --clobber
+            echo "uploaded $name"
+          done
+          gh release view "$tag" --json assets -q '.assets[].name'
