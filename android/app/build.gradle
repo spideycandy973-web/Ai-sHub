@@ -27,7 +27,15 @@ android {
                 keyAlias 'aishub'
                 keyPassword 'aishub-release'
             } else {
-                storeFile file(System.getProperty('user.home') + '/.android/debug.keystore')
+                // Falling back to a keystore that may not exist silently produces
+                // app-release-unsigned.apk, which Android refuses to install.
+                def debugKey = file(System.getProperty('user.home') + '/.android/debug.keystore')
+                if (!debugKey.exists()) {
+                    throw new GradleException(
+                        "No release keystore found. Expected android/aishub-release.jks " +
+                        "(CI provisions it; see .github/workflows/android.yml).")
+                }
+                storeFile debugKey
                 storePassword 'android'
                 keyAlias 'androiddebugkey'
                 keyPassword 'android'

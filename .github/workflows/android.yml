@@ -93,6 +93,43 @@ jobs:
 
       - name: Run the test suite
         run: npm test
+      - name: Provision the release signing key
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          KEY=android/aishub-release.jks
+          if [ -f "$KEY" ]; then echo "keystore already in the tree"; exit 0; fi
+
+          # The same key must be used for every build, otherwise Android refuses
+          # to install the update over the previous version.
+          REMOTE="https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+          TMP=$(mktemp -d)
+          if git clone --quiet --depth 1 --branch signing "$REMOTE" "$TMP/key" 2>/dev/null \
+             && [ -f "$TMP/key/aishub-release.jks" ]; then
+            cp "$TMP/key/aishub-release.jks" "$KEY"
+            echo "restored the existing release keystore from the 'signing' branch"
+          else
+            echo "creating the release keystore"
+            keytool -genkeypair -v \
+              -keystore "$KEY" -storetype JKS -storepass aishub-release \
+              -alias aishub -keypass aishub-release \
+              -keyalg RSA -keysize 2048 -validity 10950 \
+              -dname "CN=Ai'sHub, OU=Mobile, O=Ai'sHub, L=Chattogram, C=BD" 2>&1 | tail -2
+            mkdir -p "$TMP/pub"
+            cp "$KEY" "$TMP/pub/"
+            (
+              cd "$TMP/pub"
+              git init -q -b signing
+              git add aishub-release.jks
+              git -c user.name=aishub-ci -c user.email=ci@users.noreply.github.com \
+                  commit -q -m "store the Ai'sHub release signing key"
+              git push -q -f "$REMOTE" signing && echo "keystore stored on the 'signing' branch"
+            )
+          fi
+          ls -l "$KEY"
+          keytool -list -keystore "$KEY" -storepass aishub-release | tail -2
+
 
       - name: Make gradlew executable
         run: chmod +x android/gradlew
@@ -116,7 +153,9 @@ jobs:
 
       - name: Build release APK (debug-signed, installable)
         working-directory: android
-        run: ./gradlew --no-daemon --stacktrace assembleRelease 2>&1 | tee ../gradle-release.log || true
+        run: |
+          set -o pipefail
+          ./gradlew --no-daemon --stacktrace assembleRelease 2>&1 | tee ../gradle-release.log
 
       - name: Collect artifacts
         if: always()
