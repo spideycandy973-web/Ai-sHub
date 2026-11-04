@@ -125,6 +125,9 @@ jobs:
           find android/app/build/outputs/apk -name '*.apk' -exec cp -v {} out/ \; || true
           ls -lh out || true
           # keep the build log for the artifact so failures are inspectable from the repo
+          echo '--- signing state ---'
+          ls -l android/aishub-release.jks 2>/dev/null || echo "(no keystore in android/)"
+          grep -n 'signingConfig' android/app/build.gradle || echo "(no signingConfig in build.gradle)"
           cp gradle-debug.log out/ 2>/dev/null || true
           cp gradle-release.log out/ 2>/dev/null || true
           # error-only digest: tiny, greppable from the repo
