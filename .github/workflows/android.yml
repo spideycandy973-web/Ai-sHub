@@ -144,6 +144,14 @@ jobs:
             echo
             echo "===== sdk-check ====="
             cat sdk-check.txt 2>/dev/null || true
+            echo
+            echo "===== merged values.xml (resource compile input) ====="
+            head -c 4000 android/app/build/intermediates/incremental/debug/mergeDebugResources/merged.dir/values/values.xml 2>/dev/null || echo "(not produced)"
+            echo
+            echo "===== every values resource file ====="
+            find android/app/src/main/res/values android/capacitor-cordova-android-plugins/src/main/res -type f 2>/dev/null | while read -r f; do
+              echo "--- $f"; cat "$f"; echo
+            done | head -c 6000
           } > ci-log.txt
 
           git config user.name "aishub-ci"
