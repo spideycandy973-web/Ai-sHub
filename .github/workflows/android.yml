@@ -186,6 +186,51 @@ jobs:
           retention-days: 90
 
 
+      - name: Diagnose failure (if the build failed)
+        if: failure()
+        run: |
+          echo "::error::Gradle failed — see the AiHub-apk artifact (errors.txt / gradle-debug.log)"
+          sed -n '/What went wrong/,/^\*/p' gradle-debug.log 2>/dev/null | head -40 || true
+          grep -iE 'Could not (find|resolve)|Unsupported class|requires Gradle|SDK location|license' gradle-debug.log 2>/dev/null | head -20 || true
+
+      - name: Publish APK to the "builds" release
+        if: success() && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -o pipefail
+          exec > >(tee publish.log) 2>&1
+          tag=builds
+          gh release view "$tag" >/dev/null 2>&1 || gh release create "$tag" \
+            --title "Ai'sHub builds" \
+            --notes "Installable APKs built automatically from \`$GITHUB_REF_NAME\`.
+
+          **Package:** \`com.aishub\` · **App:** Ai'sHub
+
+          Download \`AisHub-<version>-release.apk\` (smaller) or \`-debug.apk\`, allow install from unknown sources, open it. No account needed; the app works offline." 
+          echo "=== OUT CONTENTS ==="; ls -l out
+          echo "=== apksigner probe ==="
+          BT=$(ls -d "$ANDROID_HOME/build-tools/"* | sort -V | tail -1)
+          for f in out/*.apk; do echo "--- $f"; "$BT/apksigner" verify --print-certs "$f" 2>&1 | head -6 || true; done
+          shopt -s nullglob
+          if ls out/*unsig* >/dev/null 2>&1; then
+            echo "::error::Refusing to publish: the release APK is unsigned and cannot be installed"
+            exit 1
+          fi
+          apks=(out/*.apk)
+          if [ ${#apks[@]} -eq 0 ]; then echo "::error::No APK produced"; exit 1; fi
+          for f in "${apks[@]}"; do
+            base=$(basename "$f")
+            case "$base" in
+              *release*) name="AisHub-$(node -p "require('./package.json').version")-release.apk" ;;
+              *) name="AisHub-$(node -p "require('./package.json').version")-debug.apk" ;;
+            esac
+            cp "$f" "out/$name"
+            gh release upload "$tag" "out/$name" --clobber
+            echo "uploaded $name"
+          done
+          gh release view "$tag" --json assets -q '.assets[].name'
+
       - name: Report build logs to the log branch
         if: always()
         continue-on-error: true
@@ -231,46 +276,3 @@ jobs:
           git commit -m "ci: build log for run $GITHUB_RUN_ID" --no-verify || echo "nothing to commit"
           git push -f origin "$LOG_BRANCH" && echo "pushed log to $LOG_BRANCH"
 
-      - name: Diagnose failure (if the build failed)
-        if: failure()
-        run: |
-          echo "::error::Gradle failed — see the AiHub-apk artifact (errors.txt / gradle-debug.log)"
-          sed -n '/What went wrong/,/^\*/p' gradle-debug.log 2>/dev/null | head -40 || true
-          grep -iE 'Could not (find|resolve)|Unsupported class|requires Gradle|SDK location|license' gradle-debug.log 2>/dev/null | head -20 || true
-
-      - name: Publish APK to the "builds" release
-        if: success() && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          set -euo pipefail
-          tag=builds
-          gh release view "$tag" >/dev/null 2>&1 || gh release create "$tag" \
-            --title "Ai'sHub builds" \
-            --notes "Installable APKs built automatically from \`$GITHUB_REF_NAME\`.
-
-          **Package:** \`com.aishub\` · **App:** Ai'sHub
-
-          Download \`AisHub-<version>-release.apk\` (smaller) or \`-debug.apk\`, allow install from unknown sources, open it. No account needed; the app works offline." 
-          echo "=== OUT CONTENTS ==="; ls -l out
-          echo "=== apksigner probe ==="
-          BT=$(ls -d "$ANDROID_HOME/build-tools/"* | sort -V | tail -1)
-          for f in out/*.apk; do echo "--- $f"; "$BT/apksigner" verify --print-certs "$f" 2>&1 | head -6 || true; done
-          shopt -s nullglob
-          if ls out/*unsig* >/dev/null 2>&1; then
-            echo "::error::Refusing to publish: the release APK is unsigned and cannot be installed"
-            exit 1
-          fi
-          apks=(out/*.apk)
-          if [ ${#apks[@]} -eq 0 ]; then echo "::error::No APK produced"; exit 1; fi
-          for f in "${apks[@]}"; do
-            base=$(basename "$f")
-            case "$base" in
-              *release*) name="AisHub-$(node -p "require('./package.json').version")-release.apk" ;;
-              *) name="AisHub-$(node -p "require('./package.json').version")-debug.apk" ;;
-            esac
-            cp "$f" "out/$name"
-            gh release upload "$tag" "out/$name" --clobber
-            echo "uploaded $name"
-          done
-          gh release view "$tag" --json assets -q '.assets[].name'
