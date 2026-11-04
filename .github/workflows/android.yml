@@ -66,10 +66,33 @@ jobs:
 
       - name: Build the web bundle and inline it into the native project
         run: |
+          set -euo pipefail
           npm run build
           npx cap copy android
           test -f android/app/src/main/assets/public/index.html
           echo "bundled index.html: $(wc -c < android/app/src/main/assets/public/index.html) bytes"
+
+          # Refuse to package a shell whose CSS/JS never got inlined: that ships an
+          # unstyled app whose composer is off-screen, i.e. "the AI won't respond".
+          BUNDLE=android/app/src/main/assets/public/index.html
+          if grep -q '@include' "$BUNDLE"; then
+            echo "::error::unresolved @include markers in the bundled web app"; exit 1
+          fi
+          node -e '
+            const fs = require("fs");
+            const h = fs.readFileSync(process.argv[1], "utf8");
+            const css = [...h.matchAll(/<style>([\s\S]*?)<\/style>/g)].map(m => m[1]).join("");
+            const js  = [...h.matchAll(/<script>([\s\S]*?)<\/script>/g)].map(m => m[1]).join("");
+            console.log(`bundled css=${css.length} js=${js.length}`);
+            if (css.length < 20000) { console.error("::error::bundled stylesheet is missing or truncated"); process.exit(1); }
+            if (js.length < 100000) { console.error("::error::bundled javascript is missing or truncated"); process.exit(1); }
+            for (const sel of [".tabbar", ".composer-wrap", ".screen"]) {
+              if (!css.includes(sel)) { console.error(`::error::bundled CSS lacks the ${sel} rule`); process.exit(1); }
+            }
+          ' "$BUNDLE"
+
+      - name: Run the test suite
+        run: npm test
 
       - name: Make gradlew executable
         run: chmod +x android/gradlew
@@ -172,7 +195,7 @@ jobs:
           grep -iE 'Could not (find|resolve)|Unsupported class|requires Gradle|SDK location|license' gradle-debug.log 2>/dev/null | head -20 || true
 
       - name: Publish APK to the "builds" release
-        if: github.event_name == 'push' && success()
+        if: success() && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
@@ -184,8 +207,12 @@ jobs:
 
           **Package:** \`com.aishub\` · **App:** Ai'sHub
 
-          Download the APK, allow install from unknown sources, open it. No account needed; the app works offline." 
+          Download \`AisHub-<version>-release.apk\` (smaller) or \`-debug.apk\`, allow install from unknown sources, open it. No account needed; the app works offline." 
           shopt -s nullglob
+          if ls out/*unsig* >/dev/null 2>&1; then
+            echo "::error::Refusing to publish: the release APK is unsigned and cannot be installed"
+            exit 1
+          fi
           apks=(out/*.apk)
           if [ ${#apks[@]} -eq 0 ]; then echo "::error::No APK produced"; exit 1; fi
           for f in "${apks[@]}"; do
