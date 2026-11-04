@@ -213,18 +213,21 @@ jobs:
           BT=$(ls -d "$ANDROID_HOME/build-tools/"* | sort -V | tail -1)
           for f in out/*.apk; do echo "--- $f"; "$BT/apksigner" verify --print-certs "$f" 2>&1 | head -6 || true; done
           shopt -s nullglob
-          if ls out/*unsig* >/dev/null 2>&1; then
-            echo "::error::Refusing to publish: the release APK is unsigned and cannot be installed"
+          unsigned=(out/*unsigned*.apk)
+          if [ ${#unsigned[@]} -gt 0 ]; then
+            echo "::error::Refusing to publish: ${unsigned[*]} is unsigned and cannot be installed"
             exit 1
           fi
           apks=(out/*.apk)
           if [ ${#apks[@]} -eq 0 ]; then echo "::error::No APK produced"; exit 1; fi
+          BT=$(ls -d "$ANDROID_HOME/build-tools/"* | sort -V | tail -1)
           for f in "${apks[@]}"; do
             base=$(basename "$f")
             case "$base" in
               *release*) name="AisHub-$(node -p "require('./package.json').version")-release.apk" ;;
               *) name="AisHub-$(node -p "require('./package.json').version")-debug.apk" ;;
             esac
+            "$BT/apksigner" verify "$f" || { echo "::error::$base failed signature verification"; exit 1; }
             cp "$f" "out/$name"
             gh release upload "$tag" "out/$name" --clobber
             echo "uploaded $name"
