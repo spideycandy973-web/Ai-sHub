@@ -74,11 +74,24 @@ jobs:
 
       - name: Build debug APK
         working-directory: android
-        run: ./gradlew --no-daemon --stacktrace assembleDebug
+        env:
+          GRADLE_OPTS: '-Dorg.gradle.jvmargs=-Xmx3g'
+        run: |
+          set -o pipefail
+          # Tee the Gradle output so the failure reason survives the run and
+          # shows up in the uploaded artifact (run logs are not always reachable).
+          ./gradlew --no-daemon --stacktrace --warning-mode all assembleDebug 2>&1 | tee ../gradle-debug.log
+          code=${PIPESTATUS[0]}
+          if [ "$code" -ne 0 ]; then
+            echo "::error::Gradle failed with exit code $code"
+            echo '----- last 120 lines -----'
+            tail -n 120 ../gradle-debug.log | sed 's/^/  /'
+            exit "$code"
+          fi
 
       - name: Build release APK (debug-signed, installable)
         working-directory: android
-        run: ./gradlew --no-daemon --stacktrace assembleRelease
+        run: ./gradlew --no-daemon --stacktrace assembleRelease 2>&1 | tee ../gradle-release.log || true
 
       - name: Collect artifacts
         if: always()
@@ -87,7 +100,12 @@ jobs:
           find android/app/build/outputs/apk -name '*.apk' -exec cp -v {} out/ \; || true
           ls -lh out || true
           # keep the build log for the artifact so failures are inspectable from the repo
-          (cd android && [ -f app/build/outputs/logs/manifest-merger-debug-report.txt ] && cp app/build/outputs/logs/manifest-merger-debug-report.txt ../out/ || true)
+          cp gradle-debug.log out/ 2>/dev/null || true
+          cp gradle-release.log out/ 2>/dev/null || true
+          # error-only digest: tiny, greppable from the repo
+          grep -iE 'error|FAILURE|Could not|Caused by|what went wrong' gradle-debug.log 2>/dev/null | head -n 60 > out/errors.txt || true
+          echo '--- errors.txt ---'
+          cat out/errors.txt 2>/dev/null || true
 
       - name: Upload APKs
         if: always()
@@ -97,6 +115,13 @@ jobs:
           path: out/*
           if-no-files-found: warn
           retention-days: 90
+
+      - name: Diagnose failure (if the build failed)
+        if: failure()
+        run: |
+          echo "::error::Gradle failed — see the AiHub-apk artifact (errors.txt / gradle-debug.log)"
+          sed -n '/What went wrong/,/^\*/p' gradle-debug.log 2>/dev/null | head -40 || true
+          grep -iE 'Could not (find|resolve)|Unsupported class|requires Gradle|SDK location|license' gradle-debug.log 2>/dev/null | head -20 || true
 
       - name: Publish APK to the "builds" release
         if: github.event_name == 'push' && success()
