@@ -171,6 +171,56 @@ jobs:
           sed -n '/What went wrong/,/^\*/p' gradle-debug.log 2>/dev/null | head -40 || true
           grep -iE 'Could not (find|resolve)|Unsupported class|requires Gradle|SDK location|license' gradle-debug.log 2>/dev/null | head -20 || true
 
+      - name: Verify the APK (package id, signature, contents)
+        if: success()
+        run: |
+          set -euo pipefail
+          APK=$(find out -name 'AisHub-*-release.apk' | head -1)
+          [ -n "$APK" ] || APK=$(find out -name '*.apk' | head -1)
+          echo "verifying $APK"
+          BT=$(ls -d "$ANDROID_HOME/build-tools/"* | sort -V | tail -1)
+          echo "build-tools: $BT"
+
+          # 1. package id + version, straight from the manifest
+          "$BT/aapt2" dump badging "$APK" | grep -E "^package:|^application-label|^sdkVersion|^targetSdkVersion" | tee apk-info.txt
+          PKG=$("$BT/aapt2" dump badging "$APK" | sed -n "s/^package: name='\([^']*\)'.*/\1/p")
+          echo "package: $PKG"
+          [ "$PKG" = "com.aishub" ] || { echo "::error::package is '$PKG', expected com.aishub"; exit 1; }
+
+          # 2. it is actually signed and verifiable
+          "$BT/apksigner" verify --verbose "$APK" | head -20 | tee apk-signature.txt
+          "$BT/apksigner" verify "$APK" || { echo "::error::APK signature does not verify"; exit 1; }
+
+          # 3. the offline web app is really bundled inside
+          unzip -l "$APK" | grep -E "assets/public/(index.html|sw.js|logo.png)" | tee apk-contents.txt
+          unzip -l "$APK" | grep -q "assets/public/index.html" || { echo "::error::bundled web app missing from the APK"; exit 1; }
+          echo "size: $(du -h "$APK" | cut -f1)"
+
+      - name: Attach the verification report to the release
+        if: github.event_name == 'push' && success()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          {
+            echo "# Ai'sHub APK verification"
+            echo
+            echo "Commit: \`$GITHUB_SHA\`"
+            echo
+            echo "## Manifest"
+            echo '```'
+            cat apk-info.txt
+            echo '```'
+            echo "## Signature"
+            echo '```'
+            head -8 apk-signature.txt
+            echo '```'
+            echo "## Bundled web app"
+            echo '```'
+            cat apk-contents.txt
+            echo '```'
+          } > APK-VERIFICATION.md
+          gh release upload builds APK-VERIFICATION.md --clobber
+
       - name: Publish APK to the "builds" release
         if: github.event_name == 'push' && success()
         env:
