@@ -16,7 +16,7 @@
 <meta property="og:title" content="Ai'sHub — your free AI agent" />
 <meta property="og:description" content="Chat + agent mode, 100+ models, auto-added new models, offline engine. Free forever." />
 <meta property="og:image" content="icon-512.png" />
-<meta name="build" content="2026-11-04 / 44efd0778d82" />
+<meta name="build" content="2026-11-05 / 990b5b7efec0" />
 <style>
 <style>
 /* ═════════════ Ai'sHub design tokens ═════════════ */
@@ -1068,7 +1068,7 @@ input[type="range"]::-webkit-slider-thumb {
   const A = (window.A = window.A || {});
 
   A.VERSION = '1.0.0';
-  A.BUILD = '2026-11-04';
+  A.BUILD = '2026-11-05';
 
   const uid = (prefix = '') =>
     prefix + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
@@ -1367,6 +1367,12 @@ input[type="range"]::-webkit-slider-thumb {
     if (!idbOK) return Promise.reject(new Error('IndexedDB unavailable'));
     if (dbPromise) return dbPromise;
     dbPromise = new Promise((resolve, reject) => {
+      // A wedged open() (another tab holding an upgrade, a killed WebView) would
+      // otherwise block every read and write forever, freezing the UI mid-send.
+      const timer = setTimeout(() => {
+        idbOK = false;
+        reject(new Error('IndexedDB open timed out'));
+      }, 5000);
       const req = indexedDB.open(DB_NAME, DB_VERSION);
       req.onupgradeneeded = () => {
         const db = req.result;
@@ -1381,12 +1387,17 @@ input[type="range"]::-webkit-slider-thumb {
           db.createObjectStore('kv', { keyPath: 'k' });
         }
       };
-      req.onsuccess = () => resolve(req.result);
+      req.onsuccess = () => {
+        clearTimeout(timer);
+        resolve(req.result);
+      };
       req.onerror = () => {
+        clearTimeout(timer);
         idbOK = false;
         reject(req.error || new Error('IndexedDB open failed'));
       };
       req.onblocked = () => {
+        clearTimeout(timer);
         idbOK = false;
         reject(new Error('IndexedDB blocked'));
       };
@@ -1401,6 +1412,8 @@ input[type="range"]::-webkit-slider-thumb {
     return open().then(
       (db) =>
         new Promise((resolve, reject) => {
+          const guard = setTimeout(() => reject(new Error('IndexedDB transaction timed out')), 5000);
+          const done = (fn, arg) => { clearTimeout(guard); fn(arg); };
           const t = db.transaction(storeName, mode);
           const store = t.objectStore(storeName);
           let result;
@@ -1410,9 +1423,9 @@ input[type="range"]::-webkit-slider-thumb {
             reject(err);
             return;
           }
-          t.oncomplete = () => resolve(result && result.__req ? result.__req.result : result);
-          t.onerror = () => reject(t.error || new Error('transaction failed'));
-          t.onabort = () => reject(t.error || new Error('transaction aborted'));
+          t.oncomplete = () => done(resolve, result && result.__req ? result.__req.result : result);
+          t.onerror = () => done(reject, t.error || new Error('transaction failed'));
+          t.onabort = () => done(reject, t.error || new Error('transaction aborted'));
         })
     );
   }
@@ -6723,11 +6736,17 @@ Rules:
     const userMsg = { role: 'user', content: text, ts: Date.now(), attachments: state.draftAttachments };
     state.draftAttachments = [];
     state.messages.push(userMsg);
-    await A.chatStore.append(state.chatId, userMsg);
+
+    // Paint the user's message BEFORE touching storage. Persisting through a
+    // wedged IndexedDB used to happen first, so the text vanished and nothing
+    // on screen ever changed — the app looked frozen and "not responding".
     dom.welcome.hidden = true;
     dom.messages.appendChild(messageNode(userMsg));
     scrollToBottom();
     updateComposerHint();
+    await A.chatStore.append(state.chatId, userMsg).catch((err) => {
+      console.warn('[chat] could not persist message', err);
+    });
 
     if (mode === 'agent') return runAgentTurn(text);
 
@@ -7876,7 +7895,7 @@ Rules:
         <img src="logo.png" width="64" height="64" alt="Ai'sHub logo" />
         <div style="font-weight:800;font-size:17px">Ai'sHub</div>
         <div class="small muted" style="margin-top:4px">Your free AI agent — 100+ models, offline engine.</div>
-        <div class="ver" style="margin-top:8px">v${A.VERSION} · build ${A.BUILD} · pkg com.aishub</div>
+        <div class="ver" style="margin-top:8px">v${A.VERSION} · <span data-build>build ${A.BUILD}</span> · pkg com.aishub</div>
         <div class="about-links">
           <a class="btn btn-ghost btn-sm" href="https://github.com/spideycandy973-web/Ai-sHub" target="_blank" rel="noopener">GitHub</a>
           <button class="btn btn-ghost btn-sm" id="btn-about-more">How it works</button>
@@ -8356,6 +8375,19 @@ Rules:
     if (!('serviceWorker' in navigator)) return;
     if (location.protocol === 'file:') return;
     if (!/^https?:$/.test(location.protocol) && !location.hostname) return;
+
+    // Inside the Android app the shell is packaged in the APK, so a service
+    // worker can only serve a STALE copy of it. Unregister and clear caches so
+    // an installed app always runs the build that shipped with it.
+    const nativeShell = /^https?:$/.test(location.protocol) && Boolean(window.Capacitor);
+    if (nativeShell) {
+      navigator.serviceWorker.getRegistrations?.().then((regs) => regs.forEach((r) => r.unregister())).catch(() => {});
+      if (window.caches?.keys) {
+        caches.keys().then((keys) => keys.filter((k) => k.startsWith('aishub-')).forEach((k) => caches.delete(k))).catch(() => {});
+      }
+      return;
+    }
+
     navigator.serviceWorker
       .register('sw.js')
       .then((reg) => {
@@ -8367,8 +8399,19 @@ Rules:
             }
           });
         });
+        // A build that changes the cache name should land immediately; otherwise a
+        // stale shell keeps being served and fixes appear not to have any effect.
+        reg.update?.().catch(() => {});
       })
       .catch((err) => console.warn('[sw]', err.message));
+  }
+
+  /* Show which build is running, so it is obvious when an old copy is cached. */
+  function stampBuild() {
+    const el = document.querySelector('[data-build]');
+    if (!el) return;
+    const build = document.querySelector('meta[name="build"]')?.content || '';
+    el.textContent = build ? `build ${build}` : '';
   }
 
   /* ─────────────── reminders ─────────────── */
@@ -8507,6 +8550,7 @@ Rules:
     updateNetLabel();
     initReminders();
     registerSW();
+    stampBuild();
 
     // splash out
     const splash = $('#splash');

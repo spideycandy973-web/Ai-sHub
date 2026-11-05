@@ -101,6 +101,12 @@
     if (!idbOK) return Promise.reject(new Error('IndexedDB unavailable'));
     if (dbPromise) return dbPromise;
     dbPromise = new Promise((resolve, reject) => {
+      // A wedged open() (another tab holding an upgrade, a killed WebView) would
+      // otherwise block every read and write forever, freezing the UI mid-send.
+      const timer = setTimeout(() => {
+        idbOK = false;
+        reject(new Error('IndexedDB open timed out'));
+      }, 5000);
       const req = indexedDB.open(DB_NAME, DB_VERSION);
       req.onupgradeneeded = () => {
         const db = req.result;
@@ -115,12 +121,17 @@
           db.createObjectStore('kv', { keyPath: 'k' });
         }
       };
-      req.onsuccess = () => resolve(req.result);
+      req.onsuccess = () => {
+        clearTimeout(timer);
+        resolve(req.result);
+      };
       req.onerror = () => {
+        clearTimeout(timer);
         idbOK = false;
         reject(req.error || new Error('IndexedDB open failed'));
       };
       req.onblocked = () => {
+        clearTimeout(timer);
         idbOK = false;
         reject(new Error('IndexedDB blocked'));
       };
@@ -135,6 +146,8 @@
     return open().then(
       (db) =>
         new Promise((resolve, reject) => {
+          const guard = setTimeout(() => reject(new Error('IndexedDB transaction timed out')), 5000);
+          const done = (fn, arg) => { clearTimeout(guard); fn(arg); };
           const t = db.transaction(storeName, mode);
           const store = t.objectStore(storeName);
           let result;
@@ -144,9 +157,9 @@
             reject(err);
             return;
           }
-          t.oncomplete = () => resolve(result && result.__req ? result.__req.result : result);
-          t.onerror = () => reject(t.error || new Error('transaction failed'));
-          t.onabort = () => reject(t.error || new Error('transaction aborted'));
+          t.oncomplete = () => done(resolve, result && result.__req ? result.__req.result : result);
+          t.onerror = () => done(reject, t.error || new Error('transaction failed'));
+          t.onabort = () => done(reject, t.error || new Error('transaction aborted'));
         })
     );
   }

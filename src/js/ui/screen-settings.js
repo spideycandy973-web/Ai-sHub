@@ -118,7 +118,7 @@
         <img src="logo.png" width="64" height="64" alt="Ai'sHub logo" />
         <div style="font-weight:800;font-size:17px">Ai'sHub</div>
         <div class="small muted" style="margin-top:4px">Your free AI agent — 100+ models, offline engine.</div>
-        <div class="ver" style="margin-top:8px">v${A.VERSION} · build ${A.BUILD} · pkg com.aishub</div>
+        <div class="ver" style="margin-top:8px">v${A.VERSION} · <span data-build>build ${A.BUILD}</span> · pkg com.aishub</div>
         <div class="about-links">
           <a class="btn btn-ghost btn-sm" href="https://github.com/spideycandy973-web/Ai-sHub" target="_blank" rel="noopener">GitHub</a>
           <button class="btn btn-ghost btn-sm" id="btn-about-more">How it works</button>

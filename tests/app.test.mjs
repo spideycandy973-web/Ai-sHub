@@ -287,3 +287,41 @@ test('the shipped shell inlines real CSS and JS (no unresolved markers)', () => 
     assert.ok(styleText.includes(sel), `stylesheet is missing the ${sel} rule`);
   }
 });
+
+/* ── regression: a wedged database must never freeze the chat ──
+   Persistence used to run before painting, and IDB had no timeout, so a stalled
+   open() left the UI frozen with the user's text gone. */
+test('a wedged IndexedDB still paints the message and answers on-device', async () => {
+  const vc = new VirtualConsole();
+  const blocked = new JSDOM(fs.readFileSync(HTML_PATH, 'utf8'), {
+    runScripts: 'outside-only',
+    pretendToBeVisual: true,
+    url: 'https://aishub.test/',
+    virtualConsole: vc,
+  });
+  const w = blocked.window;
+  Object.defineProperty(w, 'indexedDB', {
+    configurable: true,
+    value: { open: () => ({}), deleteDatabase: () => ({}) }, // handlers never fire
+  });
+  for (const s of [...w.document.querySelectorAll('script')]) {
+    try { w.eval(s.textContent); } catch (_) { /* ignore */ }
+  }
+  w.matchMedia = () => ({ matches: false, addEventListener() {}, removeEventListener() {} });
+  w.scrollTo = () => {};
+  await new Promise((r) => setTimeout(r, 300));
+
+  const input = w.document.querySelector('#input');
+  input.value = 'still there?';
+  w.document.querySelector('#btn-send').dispatchEvent(new w.MouseEvent('click', { bubbles: true }));
+
+  let answered = false;
+  for (let i = 0; i < 100 && !answered; i++) {
+    await new Promise((r) => setTimeout(r, 100));
+    const ai = w.document.querySelector('#messages .msg-ai .prose');
+    answered = Boolean(ai && ai.textContent.trim().length > 20 && !/Thinking/i.test(ai.textContent));
+  }
+  assert.ok(w.document.querySelector('#messages .msg-user'), 'the sent message is visible');
+  assert.ok(answered, 'the on-device engine still answers when storage is dead');
+  w.close();
+});

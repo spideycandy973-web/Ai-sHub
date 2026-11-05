@@ -327,11 +327,17 @@
     const userMsg = { role: 'user', content: text, ts: Date.now(), attachments: state.draftAttachments };
     state.draftAttachments = [];
     state.messages.push(userMsg);
-    await A.chatStore.append(state.chatId, userMsg);
+
+    // Paint the user's message BEFORE touching storage. Persisting through a
+    // wedged IndexedDB used to happen first, so the text vanished and nothing
+    // on screen ever changed — the app looked frozen and "not responding".
     dom.welcome.hidden = true;
     dom.messages.appendChild(messageNode(userMsg));
     scrollToBottom();
     updateComposerHint();
+    await A.chatStore.append(state.chatId, userMsg).catch((err) => {
+      console.warn('[chat] could not persist message', err);
+    });
 
     if (mode === 'agent') return runAgentTurn(text);
 

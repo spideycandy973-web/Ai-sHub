@@ -194,6 +194,19 @@
     if (!('serviceWorker' in navigator)) return;
     if (location.protocol === 'file:') return;
     if (!/^https?:$/.test(location.protocol) && !location.hostname) return;
+
+    // Inside the Android app the shell is packaged in the APK, so a service
+    // worker can only serve a STALE copy of it. Unregister and clear caches so
+    // an installed app always runs the build that shipped with it.
+    const nativeShell = /^https?:$/.test(location.protocol) && Boolean(window.Capacitor);
+    if (nativeShell) {
+      navigator.serviceWorker.getRegistrations?.().then((regs) => regs.forEach((r) => r.unregister())).catch(() => {});
+      if (window.caches?.keys) {
+        caches.keys().then((keys) => keys.filter((k) => k.startsWith('aishub-')).forEach((k) => caches.delete(k))).catch(() => {});
+      }
+      return;
+    }
+
     navigator.serviceWorker
       .register('sw.js')
       .then((reg) => {
@@ -205,8 +218,19 @@
             }
           });
         });
+        // A build that changes the cache name should land immediately; otherwise a
+        // stale shell keeps being served and fixes appear not to have any effect.
+        reg.update?.().catch(() => {});
       })
       .catch((err) => console.warn('[sw]', err.message));
+  }
+
+  /* Show which build is running, so it is obvious when an old copy is cached. */
+  function stampBuild() {
+    const el = document.querySelector('[data-build]');
+    if (!el) return;
+    const build = document.querySelector('meta[name="build"]')?.content || '';
+    el.textContent = build ? `build ${build}` : '';
   }
 
   /* ─────────────── reminders ─────────────── */
@@ -345,6 +369,7 @@
     updateNetLabel();
     initReminders();
     registerSW();
+    stampBuild();
 
     // splash out
     const splash = $('#splash');
