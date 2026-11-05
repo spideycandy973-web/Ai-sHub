@@ -219,6 +219,7 @@ jobs:
         if: success()
         run: |
           set -euo pipefail
+          exec > >(tee verify.log) 2>&1
           APK=$(find out -name '*-release.apk' | head -1)
           echo "verifying $APK"
           BT=$(ls -d "$ANDROID_HOME/build-tools/"* | sort -V | tail -1)
@@ -250,19 +251,20 @@ jobs:
           # instead of trusting that the web bundle alone made it in.
           rm -rf dexcheck && mkdir dexcheck
           unzip -o -q "$APK" 'classes*.dex' -d dexcheck
-          DEXSTR=$(cat dexcheck/classes*.dex | strings)
+          ls -l dexcheck
           for sym in PhoneControl AiHubAccessibilityService screenAction tapByText accessibilityStatus; do
-            if printf '%s' "$DEXSTR" | grep -q "$sym"; then
+            if grep -aq "$sym" dexcheck/classes*.dex; then
               echo "dex: found $sym"
             else
               echo "::error::APK is missing native symbol $sym (phone control not compiled in)"
               exit 1
             fi
           done
-          if printf '%s' "$DEXSTR" | grep -q 'phone:history'; then echo "dex: found phone routing"; fi
 
           # And that the accessibility service is declared, otherwise screen taps can never work.
-          if "$BT/aapt2" dump xmltree --file AndroidManifest.xml "$APK" | grep -q 'AiHubAccessibilityService'; then
+          MANIFEST_DUMP=$("$BT/aapt2" dump xmltree "$APK" --file AndroidManifest.xml 2>&1 || true)
+          echo "$MANIFEST_DUMP" | head -5
+          if echo "$MANIFEST_DUMP" | grep -q 'AiHubAccessibilityService'; then
             echo "manifest: accessibility service declared"
           else
             echo "::error::APK manifest does not declare AiHubAccessibilityService"
@@ -322,6 +324,9 @@ jobs:
           [ -f "$digest" ] || echo "no errors.txt was produced" > "$digest"
           {
             echo "run: $GITHUB_RUN_ID | job: $GITHUB_JOB | ref: $GITHUB_REF_NAME"
+            echo
+            echo "===== verify.log ====="
+            cat verify.log 2>/dev/null || echo "(no verify.log — verify step did not run)"
             echo
             echo "===== publish.log ====="
             cat publish.log 2>/dev/null || echo "(no publish.log — publish step did not run)"
