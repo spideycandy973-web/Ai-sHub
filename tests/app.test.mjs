@@ -8,6 +8,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { JSDOM, VirtualConsole } from 'jsdom';
+import { tokenizer, tokTypes } from 'acorn';
 
 const HTML_PATH = path.join(process.cwd(), 'docs', 'index.html');
 let dom;
@@ -369,6 +370,37 @@ test('time and duration parsing handles am/pm, noon and words', () => {
   assert.equal(P.parseDuration('set a timer for 10 minutes'), 600);
   assert.equal(P.parseDuration('timer for two minutes'), 120);
   assert.equal(P.parseDuration('timer for 2 hours'), 7200);
+});
+
+test('the shipped bundle parses on an older Android WebView (no ES2020 operators)', async () => {
+  const html = fs.readFileSync('docs/index.html', 'utf8');
+  const blocks = [...html.matchAll(/<script>([\s\S]*?)<\/script>/g)].map((m) => m[1]);
+  assert.ok(blocks.length > 5, 'the bundle has inline scripts');
+  let tokens = 0;
+  for (const [i, code] of blocks.entries()) {
+    const bad = [];
+    const tk = tokenizer(code, {
+      ecmaVersion: 2020,
+      onToken: (t) => {
+        tokens += 1;
+        if (t.type === tokTypes.questionDot) bad.push('?.');
+        if (t.type === tokTypes.coalesce) bad.push('??');
+      },
+    });
+    while (tk.getToken().type !== tokTypes.eof) { /* consume */ }
+    assert.equal(bad.length, 0, `script block ${i} still uses ${bad.join(', ')} — a pre-2020 WebView would show a blank screen`);
+  }
+  assert.ok(tokens > 10000, 'the whole bundle was actually tokenised');
+});
+
+test('a boot failure is shown on screen instead of a white page', async () => {
+  const html = fs.readFileSync('docs/index.html', 'utf8');
+  assert.match(html, /AIHUB_BOOT_ERROR/, 'the boot guard ships in the bundle');
+  const dom = await JSDOM.fromFile('docs/index.html', { runScripts: 'dangerously', pretendToBeVisual: true, url: 'https://localhost/' });
+  await new Promise((r) => setTimeout(r, 600));
+  assert.equal(typeof dom.window.AIHUB_BOOT_ERROR, 'function', 'the guard exposes a reporter');
+  assert.equal(dom.window.document.documentElement.getAttribute('data-boot'), 'ready', 'a healthy boot marks the document ready');
+  dom.window.close();
 });
 
 test('native replies never leak "undefined" when the plugin sends no message', async () => {

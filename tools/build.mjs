@@ -9,6 +9,8 @@
  */
 import { createHash } from 'node:crypto';
 import { copyFile, mkdir, readFile, readdir, rm, stat, writeFile } from 'node:fs/promises';
+import { transformSync } from 'esbuild';
+import { tokenizer, tokTypes } from 'acorn';
 import { existsSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -72,6 +74,42 @@ async function inlineHtml() {
   }
   if (!/<script>[\s\S]{500,}<\/script>/.test(html)) {
     throw new Error('no substantial JS was inlined — the script marker syntax is probably wrong');
+  }
+
+  // Old Android WebViews reject ES2020 syntax (?., ??, ||=) with a SyntaxError that
+  // kills the whole bundle and leaves a BLANK WHITE SCREEN — which no node/jsdom test
+  // can catch, because node parses it happily. Down-level every inline script to
+  // ES2017 so the app runs on WebView 55+ (Android 7 and up).
+  let transpiled = 0;
+  html = html.replace(/<script>([\s\S]*?)<\/script>/g, (whole, code) => {
+    const out = transformSync(code, { target: 'es2017', charset: 'utf8', legalComments: 'none' });
+    transpiled += 1;
+    return `<script>\n${out.code}\n</script>`;
+  });
+  if (!transpiled) throw new Error('no inline <script> blocks were found to transpile');
+
+  const jsBlocks = [...html.matchAll(/<script>([\s\S]*?)<\/script>/g)].map((mm) => mm[1]);
+
+  // Guarantee the shipped scripts are parseable by an older Android WebView. This is the
+  // exact failure that produced a blank white screen: ES2020 operators parsed fine in node
+  // and jsdom, then threw a SyntaxError on the phone and killed the whole bundle.
+  for (const [idx, code] of jsBlocks.entries()) {
+    const ops = [];
+    try {
+      const tk = tokenizer(code, {
+        ecmaVersion: 2020,
+        onToken: (t) => {
+          if (t.type === tokTypes.questionDot) ops.push('?.');
+          if (t.type === tokTypes.coalesce) ops.push('??');
+        },
+      });
+      while (tk.getToken().type !== tokTypes.eof) { /* walk the whole stream */ }
+    } catch (err) {
+      throw new Error(`script block ${idx} does not parse (${err.message}) — the app would show a blank screen`);
+    }
+    if (ops.length) {
+      throw new Error(`script block ${idx} still contains ${ops.length} ES2020 operator(s) after transpilation — older Android WebViews would show a blank screen`);
+    }
   }
 
   html = html

@@ -429,6 +429,9 @@
     document.addEventListener('visibilitychange', () => {
       if (!document.hidden && A.discovery.shouldAutoSync()) A.discovery.syncAll({}).catch(() => {});
     });
+    // Boot finished: the guard in index.html stops watching for a blank screen.
+    window.AIHUB_BOOTED = true;
+    document.documentElement.setAttribute('data-boot', 'ready');
   }
 
   A.app = {

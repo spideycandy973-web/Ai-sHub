@@ -25,6 +25,62 @@
 </style>
 </head>
 <body>
+<script>
+/* Boot guard — plain ES5, no dependencies, runs before anything else.
+   If the app cannot start (old WebView syntax error, bad bundle, crash) this shows
+   the real reason on screen instead of leaving a blank white page. */
+(function () {
+  var shown = false;
+  function panel(title, detail) {
+    if (shown) return;
+    shown = true;
+    try {
+      var d = document.createElement('div');
+      d.setAttribute('style', 'position:fixed;top:0;left:0;right:0;bottom:0;z-index:2147483647;' +
+        'background:#07070B;color:#EDEBFF;padding:26px 20px;overflow:auto;' +
+        'font-family:-apple-system,Roboto,"Segoe UI",sans-serif;');
+      var h = document.createElement('div');
+      h.setAttribute('style', 'font-size:19px;font-weight:700;line-height:1.35;color:#FF7AB6;margin-bottom:12px;');
+      h.textContent = title;
+      var pre = document.createElement('pre');
+      pre.setAttribute('style', 'white-space:pre-wrap;word-break:break-word;font-size:12px;line-height:1.55;' +
+        'color:#B9B7D0;background:#12121C;border:1px solid #26263C;border-radius:12px;padding:12px;margin:0 0 14px;');
+      pre.textContent = detail;
+      var btn = document.createElement('button');
+      btn.textContent = 'Reload';
+      btn.setAttribute('style', 'display:inline-block;background:#7C5CFF;color:#fff;border:0;border-radius:11px;' +
+        'padding:11px 20px;font-size:14px;font-weight:600;');
+      btn.onclick = function () { location.reload(); };
+      d.appendChild(h);
+      d.appendChild(btn);
+      document.body.insertBefore(d, document.body.firstChild);
+      document.body.insertBefore(pre, btn);
+    } catch (e) { /* nothing else we can do */ }
+  }
+  function detailOf(err) {
+    if (!err) return 'Unknown error';
+    var text = (err.name ? err.name + ': ' : '') + (err.message || String(err));
+    if (err.stack) text += '\n\n' + String(err.stack).split('\n').slice(0, 4).join('\n');
+    return text;
+  }
+  window.AIHUB_BOOT_ERROR = panel;
+  window.addEventListener('error', function (e) {
+    if (window.AIHUB_BOOTED) return;               // already running: not a blank screen
+    panel("Ai'sHub could not start", detailOf(e.error) + (e.message && !e.error ? String(e.message) : ''));
+  });
+  window.addEventListener('unhandledrejection', function (e) {
+    if (window.AIHUB_BOOTED) return;
+    panel("Ai'sHub hit an error before starting", detailOf(e.reason));
+  });
+  setTimeout(function () {
+    if (window.AIHUB_BOOTED) return;
+    var ua = navigator.userAgent || 'unknown';
+    var webview = (ua.match(/Chrome\/[\d.]+/) || ['Chrome version unknown'])[0];
+    panel("Ai'sHub did not finish starting", 'The page loaded but the app never became ready.\n\n' +
+      webview + '\n' + ua);
+  }, 9000);
+})();
+</script>
 <div id="app" class="app-shell">
   <!-- ══ header ══ -->
   <header class="topbar" id="topbar">

@@ -242,6 +242,12 @@ jobs:
             if (h.includes("@include")) fail("APK ships unresolved @include markers");
             if (css.length < 20000) fail("APK ships a nearly empty stylesheet (unstyled app)");
             if (js.length < 100000) fail("APK ships a truncated script bundle");
+            // A blank white screen is the worst failure mode: prove the in-page guard ships,
+            // and that no ES2020 operator is left to break an older WebView parser.
+            if (!h.includes("AIHUB_BOOT_ERROR")) fail("APK ships no boot-error guard (a crash would look like a white screen)");
+            const es2020 = js.match(/\?\.[A-Za-z_$[(]|\?\?/g) || [];
+            if (es2020.length > 3) fail(`APK bundle has ${es2020.length} ES2020 operators - older WebViews blank-screen`);
+            console.log(`boot guard: present | ES2020 operators outside strings: ${es2020.length}`);
             for (const sel of [".tabbar", ".composer-wrap", ".screen"]) {
               if (!css.includes(sel)) fail(`APK stylesheet lacks the ${sel} rule`);
             }
