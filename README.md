@@ -9,7 +9,7 @@
 Chat + agent mode · 118 models across 23 providers · new models add themselves
 Android app (`com.aishub`) · installable PWA · no account, no subscription, no tracking
 
-[![tests](https://img.shields.io/badge/tests-21%20passing-34D399?style=flat-square)](#tests)
+[![tests](https://img.shields.io/badge/tests-26%20passing-34D399?style=flat-square)](#tests)
 [![models](https://img.shields.io/badge/models-118-7C5CFF?style=flat-square)](#the-model-catalog)
 [![offline](https://img.shields.io/badge/offline-yes-22D3EE?style=flat-square)](#offline-mode)
 [![package](https://img.shields.io/badge/pkg-com.aishub-FF7AB6?style=flat-square)](#build-the-android-apk)
@@ -131,6 +131,37 @@ with no server and no Play Store dependency.
 attaches them to a `builds` release. It needs GitHub Actions enabled on the repository
 (Settings → Actions → Allow all actions). `.github/workflows/pages.yml` publishes the PWA to GitHub
 Pages from `docs/` the same way.
+
+## Phone control
+
+Chat with Ai'sHub and ask it to do something on the phone. It recognises the request, calls a
+native Android plugin (`PhoneControl`), does the thing, and writes a plain answer back into the
+chat — no menus, no buttons to hunt for.
+
+| What you can say | What happens | Permission it may ask for once |
+| --- | --- | --- |
+| "wake me at 6:30 am" · "set a timer for 10 minutes" | real system alarm / timer | alarms |
+| "what's on my calendar tomorrow" · "add a meeting at 3 pm" | reads / creates calendar events | calendar |
+| "call Ammu" · "text Rahim that I'm late" | opens the dialer / SMS composer pre-filled | contacts, phone, SMS |
+| "open YouTube" · "what apps do I have" | launches an app / lists installed apps | none (query only) |
+| "turn on the torch" · "set volume to 30" · "make the screen brighter" | flashlight, media volume, brightness | camera torch, settings |
+| "vibrate" · "copy this to my clipboard" | haptics, clipboard | none |
+| "battery" · "storage" · "open Wi-Fi settings" | device status, jumps to the right settings panel | none |
+| "read this screen" · "tap Search" · "type hello" | reads the screen, taps by label, types into a field | **accessibility service** |
+
+Enable the accessibility service only if you want Ai'sHub to touch the screen for you:
+Android **Settings → Accessibility → Installed apps / Downloaded apps → "Ai'sHub control" → On**.
+Until you do, everything in the last row answers with one honest sentence instead of pretending.
+
+### What it does not do
+
+No app can be "exactly like a cloud assistant" on a phone, and it would be dishonest to claim it.
+Ai'sHub has **no on-device language model** — the APK ships no weights and no runtime, so the brain
+is the keyless cloud model (internet) or the built-in offline engine (no internet). Phone actions are
+**one action per request, started by you, confirmed on screen**; there is no silent background
+automation, no root, and Wi-Fi/Bluetooth toggles can only open their settings pages on modern
+Android. It is free forever with no account, which is exactly what keeps it from being a paid
+service with its own servers.
 
 ## Repository layout
 

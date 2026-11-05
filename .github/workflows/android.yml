@@ -246,6 +246,29 @@ jobs:
             }
           '
 
+          # The phone-control layer is native Java. Confirm it is really in the shipped dex
+          # instead of trusting that the web bundle alone made it in.
+          rm -rf dexcheck && mkdir dexcheck
+          unzip -o -q "$APK" 'classes*.dex' -d dexcheck
+          DEXSTR=$(cat dexcheck/classes*.dex | strings)
+          for sym in PhoneControl AiHubAccessibilityService screenAction tapByText accessibilityStatus; do
+            if printf '%s' "$DEXSTR" | grep -q "$sym"; then
+              echo "dex: found $sym"
+            else
+              echo "::error::APK is missing native symbol $sym (phone control not compiled in)"
+              exit 1
+            fi
+          done
+          if printf '%s' "$DEXSTR" | grep -q 'phone:history'; then echo "dex: found phone routing"; fi
+
+          # And that the accessibility service is declared, otherwise screen taps can never work.
+          if "$BT/aapt2" dump xmltree --file AndroidManifest.xml "$APK" | grep -q 'AiHubAccessibilityService'; then
+            echo "manifest: accessibility service declared"
+          else
+            echo "::error::APK manifest does not declare AiHubAccessibilityService"
+            exit 1
+          fi
+
       - name: Publish APK to the "builds" release
         if: success() && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
         env:
