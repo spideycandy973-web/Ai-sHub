@@ -94,6 +94,32 @@
       ${group(
         'Data',
         `<div class="switch-row">
+      </section>
+
+      <!-- ══ phone control ══ -->
+      <section class="group">
+        <h2 class="group-title">Phone control</h2>
+        <div class="card" style="padding:14px">
+          <div class="vstack" style="gap:10px">
+            <div class="hstack" style="gap:10px">
+              <span class="sg-ico" style="width:30px;height:30px;border-radius:10px;background:rgba(124,92,255,.16);color:#c4b5fd;display:grid;place-items:center">${icon('bolt')}</span>
+              <div><div style="font-size:13px;font-weight:650">Let the assistant use this phone</div>
+              <div class="small muted">Alarms, calendar, apps, flashlight, screen taps — free and on-device.</div></div>
+            </div>
+            <div class="small muted" id="phone-status">Checking…</div>
+            <div class="hstack" style="gap:8px;flex-wrap:wrap">
+              <button class="btn btn-ghost btn-sm" id="btn-phone-check">Check capabilities</button>
+              <button class="btn btn-ghost btn-sm" id="btn-phone-access">Screen control</button>
+              <button class="btn btn-ghost btn-sm" id="btn-phone-log">Activity</button>
+            </div>
+            <div class="small muted">Try in Chat: “set an alarm for 7:30”, “open youtube”, “text 01712345678 I'm late”.</div>
+          </div>
+        </div>
+      </section>
+
+      <section class="group">
+        <h2 class="group-title">Data</h2>
+        <div class="switch-row">
            <div><div class="label">Export everything</div><div class="sub">Chats, settings and notes as JSON.</div></div>
            <button class="btn btn-ghost btn-sm" id="btn-export">Export</button>
          </div>
@@ -245,6 +271,39 @@
     host.querySelector('#btn-export').addEventListener('click', exportAll);
     host.querySelector('#btn-import').addEventListener('click', importBackup);
     host.querySelector('#btn-install').addEventListener('click', () => A.app.installPrompt());
+
+    /* ── phone control ── */
+    const phoneStatus = host.querySelector('#phone-status');
+    const describePhone = async () => {
+      if (!phoneStatus) return;
+      if (!A.phone.available()) {
+        phoneStatus.innerHTML = 'Phone control needs the <strong>Android app</strong>. In this browser it stays read-only.';
+        return;
+      }
+      const cap = await A.phone.capabilities();
+      const on = Object.entries(cap.features || {}).filter(([, v]) => v).map(([k]) => k);
+      phoneStatus.innerHTML = `${cap.model || 'This phone'} · Android ${cap.androidVersion || '?'} — <strong>${on.length} capabilities</strong> active${cap.features?.accessibilityClicks ? '' : ' · screen taps need the accessibility switch'}`;
+    };
+    describePhone();
+    host.querySelector('#btn-phone-check')?.addEventListener('click', describePhone);
+    host.querySelector('#btn-phone-access')?.addEventListener('click', async () => {
+      try {
+        if (!A.phone.available()) throw new Error('Install the Android app to control the phone.');
+        const st = await A.phone.call('accessibilityStatus', {});
+        if (st.enabled) { toast('Screen control is already on', 'ok'); return; }
+        await A.phone.call('openAccessibilitySettings', {});
+        toast('Enable “Ai\'sHub control” in the list', '', 5000);
+      } catch (err) {
+        toast(err.message, 'err', 4000);
+      }
+    });
+    host.querySelector('#btn-phone-log')?.addEventListener('click', () => {
+      const list = A.phoneActions.history();
+      const body = list.length
+        ? `<div class="vstack" style="gap:8px">${list.slice(0, 30).map((h) => `<div class="small"><span class="muted">${new Date(h.ts).toLocaleString()}</span><br><strong>${esc(h.action || '')}</strong> — ${esc(h.request || '')}${h.ok ? '' : `<br><span class="warn">${esc(h.message || 'failed')}</span>`}</div>`).join('')}</div>`
+        : '<p class="small muted">Nothing yet. Ask me to set an alarm or open an app.</p>';
+      openSheet('Phone activity', `<div class="card" style="padding:14px">${body}</div>`);
+    });
     host.querySelector('#btn-clear-chats').addEventListener('click', async () => {
       const ok = await A.ui.confirmDialog('Clear all chats?', 'Every conversation on this device will be deleted. This cannot be undone.', { okLabel: 'Clear', danger: true });
       if (!ok) return;

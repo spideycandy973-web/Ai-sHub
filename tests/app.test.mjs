@@ -325,3 +325,56 @@ test('a wedged IndexedDB still paints the message and answers on-device', async 
   assert.ok(answered, 'the on-device engine still answers when storage is dead');
   w.close();
 });
+
+/* ── phone control: natural language → device actions ── */
+test('phone requests are recognised from plain language', () => {
+  const P = A.phoneActions;
+  const expect = {
+    'set an alarm for 7:30 am': 'alarm',
+    'wake me up at 6:45 pm': 'alarm',
+    'set a timer for 10 minutes': 'timer',
+    'remind me in 25 minutes': 'timer',
+    "what's on my calendar": 'agenda',
+    'add a meeting tomorrow at 3pm': 'event',
+    'find contact Rahim': 'contact',
+    'call 01712345678': 'call',
+    'text 01712345678 saying I will be late': 'sms',
+    'open youtube': 'openApp',
+    'turn on the flashlight': 'torchOn',
+    'turn off flashlight': 'torchOff',
+    'set volume to 40%': 'volume',
+    'copy hello world': 'clipboard',
+    'how much battery do I have': 'battery',
+    'read the screen': 'screenRead',
+    'tap Login': 'screenTap',
+    'vibrate': 'vibrate',
+  };
+  for (const [phrase, action] of Object.entries(expect)) {
+    assert.equal(P.detect(phrase)?.name, action, `"${phrase}" should map to ${action}`);
+  }
+  // ordinary chatting must NOT be treated as phone control
+  for (const phrase of ['what is the capital of France', 'write me an email to my boss', 'explain photosynthesis']) {
+    assert.equal(P.detect(phrase), null, `"${phrase}" should stay a normal chat question`);
+  }
+});
+
+test('time and duration parsing handles am/pm, noon and words', () => {
+  const P = A.phoneActions;
+  // note: values cross the jsdom realm boundary, so compare fields not prototypes
+  const at = (phrase) => { const t = P.parseTime(phrase); return t && `${t.hour}:${t.minute}`; };
+  assert.equal(at('set an alarm for 7:30 am'), '7:30');
+  assert.equal(at('wake me up at 6:45 pm'), '18:45');
+  assert.equal(at('alarm at 12 pm'), '12:0');
+  assert.equal(at('alarm 12:00 am'), '0:0');
+  assert.equal(P.parseDuration('set a timer for 10 minutes'), 600);
+  assert.equal(P.parseDuration('timer for two minutes'), 120);
+  assert.equal(P.parseDuration('timer for 2 hours'), 7200);
+});
+
+test('on the web, phone actions explain the limitation instead of failing', async () => {
+  assert.equal(A.phone.available(), false, 'jsdom has no native bridge');
+  const res = await A.phoneActions.tryHandle('set an alarm for 7:30 am');
+  assert.ok(res, 'the request is handled, not ignored');
+  assert.equal(res.ok, false);
+  assert.match(res.text, /Android app/i, 'the reply points at the APK');
+});
