@@ -82,7 +82,7 @@ async function inlineHtml() {
   // ES2017 so the app runs on WebView 55+ (Android 7 and up).
   let transpiled = 0;
   html = html.replace(/<script>([\s\S]*?)<\/script>/g, (whole, code) => {
-    const out = transformSync(code, { target: 'es2017', charset: 'utf8', legalComments: 'none' });
+    const out = transformSync(code, { target: 'es2015', charset: 'utf8', legalComments: 'none' });
     transpiled += 1;
     return `<script>\n${out.code}\n</script>`;
   });
@@ -99,6 +99,7 @@ async function inlineHtml() {
       const tk = tokenizer(code, {
         ecmaVersion: 2020,
         onToken: (t) => {
+          if (t.type === tokTypes.regexp && /\\p\{/.test(t.value.pattern)) ops.push('\\p{...} regex literal');
           if (t.type === tokTypes.questionDot) ops.push('?.');
           if (t.type === tokTypes.coalesce) ops.push('??');
         },
@@ -108,7 +109,7 @@ async function inlineHtml() {
       throw new Error(`script block ${idx} does not parse (${err.message}) — the app would show a blank screen`);
     }
     if (ops.length) {
-      throw new Error(`script block ${idx} still contains ${ops.length} ES2020 operator(s) after transpilation — older Android WebViews would show a blank screen`);
+      throw new Error(`script block ${idx} still contains ${ops.length} unsupported construct(s) [${ops.join(', ')}] after transpilation — older Android WebViews would show a blank screen`);
     }
   }
 

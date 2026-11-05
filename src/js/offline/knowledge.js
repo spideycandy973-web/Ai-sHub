@@ -1024,7 +1024,7 @@ Paste your text and tell me the language, and I'll do what this engine can — o
   const tokens = (text = '') =>
     text
       .toLowerCase()
-      .replace(/[^\p{L}\p{N}\s+#]/gu, ' ')
+      .replace(A.util.notWordRe(), ' ')
       .split(/\s+/)
       .filter((w) => w && w.length > 1 && !STOP.has(w));
 

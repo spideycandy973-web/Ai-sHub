@@ -102,7 +102,7 @@
       description: 'Count words, characters, sentences and estimate reading time.',
       params: { text: 'string' },
       run: async ({ text = '' }) => {
-        const words = (text.match(/[\p{L}\p{N}'’-]+/gu) || []).length;
+        const words = (text.match(A.util.wordRe()) || []).length;
         return {
           words,
           characters: text.length,

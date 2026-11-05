@@ -194,10 +194,30 @@
     return v === undefined || v === null || (typeof v === 'string' && !v.trim());
   }
 
+  /* Unicode-aware word matchers. A \p{...} REGEX LITERAL is a parse error on an Android
+     WebView older than Chrome 64 — and a parse error blanks the entire app, so the pattern
+     is built at runtime and degrades to ASCII where the engine cannot do better. */
+  let wordReCache = null;
+  let notWordReCache = null;
+  function wordRe() {
+    if (!wordReCache) {
+      try { wordReCache = new RegExp("[\\p{L}\\p{N}'\u2019-]+", 'gu'); }
+      catch (e) { wordReCache = /[A-Za-z0-9'\u2019-]+/g; }
+    }
+    return wordReCache;
+  }
+  function notWordRe() {
+    if (!notWordReCache) {
+      try { notWordReCache = new RegExp('[^\\p{L}\\p{N}\\s+#]', 'gu'); }
+      catch (e) { notWordReCache = /[^A-Za-z0-9\s+#]/g; }
+    }
+    return notWordReCache;
+  }
+
   A.util = {
     uid, clamp, sleep, escapeHtml, escapeAttr, debounce, throttle, estimateTokens,
     fmtTime, fmtRelative, fmtDate, fmtCount, hash, truncate, slugify, titleFrom, pick,
     groupBy, copyText, download, readFileAsDataUrl, readFileAsText, sanitizeJsonParse,
-    stripFences, isBlank,
+    stripFences, isBlank, wordRe, notWordRe,
   };
 })();

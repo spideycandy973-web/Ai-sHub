@@ -549,7 +549,7 @@ Store it in a real password manager — not in chat history.`;
   function wordCountAnswer(text) {
     const body = text.replace(/^(word count|count words|how many words).*?[:]\s*/i, '').replace(/^(word count|count words|how many words.*)$/i, '');
     const sample = body.length > 3 ? body : text;
-    const words = (sample.match(/[\p{L}\p{N}'’-]+/gu) || []).length;
+    const words = (sample.match(A.util.wordRe()) || []).length;
     const chars = sample.length;
     const charsNoSpace = sample.replace(/\s/g, '').length;
     const sentences = (sample.match(/[.!?]+(?:\s|$)/g) || []).length || (sample.trim() ? 1 : 0);

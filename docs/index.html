@@ -16,7 +16,7 @@
 <meta property="og:title" content="Ai'sHub — your free AI agent" />
 <meta property="og:description" content="Chat + agent mode, 100+ models, auto-added new models, offline engine. Free forever." />
 <meta property="og:image" content="icon-512.png" />
-<meta name="build" content="2026-11-05 / 9803932f1b04" />
+<meta name="build" content="2026-11-05 / ef29c5f08744" />
 <style>
 <style>
 /* ═════════════ Ai'sHub design tokens ═════════════ */
@@ -1111,6 +1111,26 @@ input[type="range"]::-webkit-slider-thumb {
 
 <!-- ══ scripts (ordered: dependencies first) ══ -->
 <script>
+var __async = (__this, __arguments, generator) => {
+  return new Promise((resolve, reject) => {
+    var fulfilled = (value) => {
+      try {
+        step(generator.next(value));
+      } catch (e) {
+        reject(e);
+      }
+    };
+    var rejected = (value) => {
+      try {
+        step(generator.throw(value));
+      } catch (e) {
+        reject(e);
+      }
+    };
+    var step = (x) => x.done ? resolve(x.value) : Promise.resolve(x.value).then(fulfilled, rejected);
+    step((generator = generator.apply(__this, __arguments)).next());
+  });
+};
 (function() {
   "use strict";
   const A = window.A = window.A || {};
@@ -1195,27 +1215,29 @@ input[type="range"]::-webkit-slider-thumb {
       return acc;
     }, {});
   }
-  async function copyText(text) {
-    try {
-      if (navigator.clipboard && window.isSecureContext) {
-        await navigator.clipboard.writeText(text);
-        return true;
+  function copyText(text) {
+    return __async(this, null, function* () {
+      try {
+        if (navigator.clipboard && window.isSecureContext) {
+          yield navigator.clipboard.writeText(text);
+          return true;
+        }
+      } catch (_) {
       }
-    } catch (_) {
-    }
-    try {
-      const ta = document.createElement("textarea");
-      ta.value = text;
-      ta.setAttribute("readonly", "");
-      ta.style.cssText = "position:fixed;top:-1000px;opacity:0";
-      document.body.appendChild(ta);
-      ta.select();
-      const ok = document.execCommand("copy");
-      ta.remove();
-      return ok;
-    } catch (_) {
-      return false;
-    }
+      try {
+        const ta = document.createElement("textarea");
+        ta.value = text;
+        ta.setAttribute("readonly", "");
+        ta.style.cssText = "position:fixed;top:-1000px;opacity:0";
+        document.body.appendChild(ta);
+        ta.select();
+        const ok = document.execCommand("copy");
+        ta.remove();
+        return ok;
+      } catch (_) {
+        return false;
+      }
+    });
   }
   function download(filename, content, type = "text/plain;charset=utf-8") {
     const blob = content instanceof Blob ? content : new Blob([content], { type });
@@ -1265,6 +1287,28 @@ input[type="range"]::-webkit-slider-thumb {
   function isBlank(v) {
     return v === void 0 || v === null || typeof v === "string" && !v.trim();
   }
+  let wordReCache = null;
+  let notWordReCache = null;
+  function wordRe() {
+    if (!wordReCache) {
+      try {
+        wordReCache = new RegExp("[\\p{L}\\p{N}'’-]+", "gu");
+      } catch (e) {
+        wordReCache = /[A-Za-z0-9'\u2019-]+/g;
+      }
+    }
+    return wordReCache;
+  }
+  function notWordRe() {
+    if (!notWordReCache) {
+      try {
+        notWordReCache = new RegExp("[^\\p{L}\\p{N}\\s+#]", "gu");
+      } catch (e) {
+        notWordReCache = /[^A-Za-z0-9\s+#]/g;
+      }
+    }
+    return notWordReCache;
+  }
   A.util = {
     uid,
     clamp,
@@ -1290,7 +1334,9 @@ input[type="range"]::-webkit-slider-thumb {
     readFileAsText,
     sanitizeJsonParse,
     stripFences,
-    isBlank
+    isBlank,
+    wordRe,
+    notWordRe
   };
 })();
 
@@ -1315,6 +1361,26 @@ var __spreadValues = (a, b) => {
   return a;
 };
 var __spreadProps = (a, b) => __defProps(a, __getOwnPropDescs(b));
+var __async = (__this, __arguments, generator) => {
+  return new Promise((resolve, reject) => {
+    var fulfilled = (value) => {
+      try {
+        step(generator.next(value));
+      } catch (e) {
+        reject(e);
+      }
+    };
+    var rejected = (value) => {
+      try {
+        step(generator.throw(value));
+      } catch (e) {
+        reject(e);
+      }
+    };
+    var step = (x) => x.done ? resolve(x.value) : Promise.resolve(x.value).then(fulfilled, rejected);
+    step((generator = generator.apply(__this, __arguments)).next());
+  });
+};
 (function() {
   "use strict";
   const A = window.A;
@@ -1464,110 +1530,128 @@ var __spreadProps = (a, b) => __defProps(a, __getOwnPropDescs(b));
     get available() {
       return idbOK;
     },
-    async putMessages(chatId, messages) {
-      try {
-        return await tx("messages", "readwrite", (store) => {
-          for (const m of messages) store.put(__spreadProps(__spreadValues({}, m), { chatId }));
-          return { __req: { result: true } };
-        });
-      } catch (_) {
-        const existing = KV.get("msgs:" + chatId, []);
-        const byId = new Map(existing.map((m) => [m.id, m]));
-        for (const m of messages) byId.set(m.id, __spreadProps(__spreadValues({}, m), { chatId }));
-        KV.set("msgs:" + chatId, [...byId.values()].sort((a, b) => a.ts - b.ts).slice(-400));
-        return true;
-      }
+    putMessages(chatId, messages) {
+      return __async(this, null, function* () {
+        try {
+          return yield tx("messages", "readwrite", (store) => {
+            for (const m of messages) store.put(__spreadProps(__spreadValues({}, m), { chatId }));
+            return { __req: { result: true } };
+          });
+        } catch (_) {
+          const existing = KV.get("msgs:" + chatId, []);
+          const byId = new Map(existing.map((m) => [m.id, m]));
+          for (const m of messages) byId.set(m.id, __spreadProps(__spreadValues({}, m), { chatId }));
+          KV.set("msgs:" + chatId, [...byId.values()].sort((a, b) => a.ts - b.ts).slice(-400));
+          return true;
+        }
+      });
     },
-    async putMessage(chatId, message) {
-      return DB.putMessages(chatId, [message]);
+    putMessage(chatId, message) {
+      return __async(this, null, function* () {
+        return DB.putMessages(chatId, [message]);
+      });
     },
-    async deleteMessage(chatId, messageId) {
-      try {
-        return await tx("messages", "readwrite", (store) => {
-          store.delete(messageId);
-          return { __req: { result: true } };
-        });
-      } catch (_) {
-        const mirror = KV.get("msgs:" + chatId, []).filter((m) => m.id !== messageId);
-        KV.set("msgs:" + chatId, mirror);
-        return true;
-      }
+    deleteMessage(chatId, messageId) {
+      return __async(this, null, function* () {
+        try {
+          return yield tx("messages", "readwrite", (store) => {
+            store.delete(messageId);
+            return { __req: { result: true } };
+          });
+        } catch (_) {
+          const mirror = KV.get("msgs:" + chatId, []).filter((m) => m.id !== messageId);
+          KV.set("msgs:" + chatId, mirror);
+          return true;
+        }
+      });
     },
-    async getMessages(chatId) {
-      try {
-        const list = await tx(
-          "messages",
-          "readonly",
-          (store) => ({ __req: store.index("chatId").getAll(IDBKeyRange.only(chatId)) })
-        );
-        return (list || []).sort((a, b) => a.ts - b.ts);
-      } catch (_) {
-        return KV.get("msgs:" + chatId, []);
-      }
+    getMessages(chatId) {
+      return __async(this, null, function* () {
+        try {
+          const list = yield tx(
+            "messages",
+            "readonly",
+            (store) => ({ __req: store.index("chatId").getAll(IDBKeyRange.only(chatId)) })
+          );
+          return (list || []).sort((a, b) => a.ts - b.ts);
+        } catch (_) {
+          return KV.get("msgs:" + chatId, []);
+        }
+      });
     },
-    async deleteChat(chatId) {
-      try {
-        await tx("messages", "readwrite", (store) => {
-          const idx = store.index("chatId");
-          const req = idx.openCursor(IDBKeyRange.only(chatId));
-          req.onsuccess = () => {
-            const cursor = req.result;
-            if (cursor) {
-              cursor.delete();
-              cursor.continue();
-            }
-          };
-          return { __req: { result: true } };
-        });
-      } catch (_) {
-      }
-      KV.remove("msgs:" + chatId);
+    deleteChat(chatId) {
+      return __async(this, null, function* () {
+        try {
+          yield tx("messages", "readwrite", (store) => {
+            const idx = store.index("chatId");
+            const req = idx.openCursor(IDBKeyRange.only(chatId));
+            req.onsuccess = () => {
+              const cursor = req.result;
+              if (cursor) {
+                cursor.delete();
+                cursor.continue();
+              }
+            };
+            return { __req: { result: true } };
+          });
+        } catch (_) {
+        }
+        KV.remove("msgs:" + chatId);
+      });
     },
-    async putTask(task) {
-      try {
-        return await tx("tasks", "readwrite", (store) => {
-          store.put(task);
-          return { __req: { result: true } };
-        });
-      } catch (_) {
-        const tasks = KV.get("tasks", {});
-        tasks[task.id] = task;
-        KV.set("tasks", tasks);
-        return true;
-      }
+    putTask(task) {
+      return __async(this, null, function* () {
+        try {
+          return yield tx("tasks", "readwrite", (store) => {
+            store.put(task);
+            return { __req: { result: true } };
+          });
+        } catch (_) {
+          const tasks = KV.get("tasks", {});
+          tasks[task.id] = task;
+          KV.set("tasks", tasks);
+          return true;
+        }
+      });
     },
-    async getTasks() {
-      try {
-        const list = await tx("tasks", "readonly", (store) => ({ __req: store.getAll() }));
-        return list || [];
-      } catch (_) {
-        return Object.values(KV.get("tasks", {}));
-      }
+    getTasks() {
+      return __async(this, null, function* () {
+        try {
+          const list = yield tx("tasks", "readonly", (store) => ({ __req: store.getAll() }));
+          return list || [];
+        } catch (_) {
+          return Object.values(KV.get("tasks", {}));
+        }
+      });
     },
-    async deleteTask(id) {
-      try {
-        await tx("tasks", "readwrite", (store) => {
-          store.delete(id);
-          return { __req: { result: true } };
-        });
-      } catch (_) {
-        const tasks = KV.get("tasks", {});
-        delete tasks[id];
-        KV.set("tasks", tasks);
-      }
+    deleteTask(id) {
+      return __async(this, null, function* () {
+        try {
+          yield tx("tasks", "readwrite", (store) => {
+            store.delete(id);
+            return { __req: { result: true } };
+          });
+        } catch (_) {
+          const tasks = KV.get("tasks", {});
+          delete tasks[id];
+          KV.set("tasks", tasks);
+        }
+      });
     },
-    async wipe() {
-      try {
-        await tx("messages", "readwrite", (store) => {
-          store.clear();
-          return { __req: { result: true } };
-        });
-        await tx("tasks", "readwrite", (store) => {
-          store.clear();
-          return { __req: { result: true } };
-        });
-      } catch (_) {
-      }
+    wipe() {
+      return __async(this, null, function* () {
+        try {
+          yield tx("messages", "readwrite", (store) => {
+            store.clear();
+            return { __req: { result: true } };
+          });
+          yield tx("tasks", "readwrite", (store) => {
+            store.clear();
+            return { __req: { result: true } };
+          });
+        } catch (_) {
+        }
+      });
     }
   };
   A.store = { KV, DB, PREFIX };
@@ -1687,6 +1771,26 @@ var __spreadProps = (a, b) => __defProps(a, __getOwnPropDescs(b));
 
 </script>
 <script>
+var __async = (__this, __arguments, generator) => {
+  return new Promise((resolve, reject) => {
+    var fulfilled = (value) => {
+      try {
+        step(generator.next(value));
+      } catch (e) {
+        reject(e);
+      }
+    };
+    var rejected = (value) => {
+      try {
+        step(generator.throw(value));
+      } catch (e) {
+        reject(e);
+      }
+    };
+    var step = (x) => x.done ? resolve(x.value) : Promise.resolve(x.value).then(fulfilled, rejected);
+    step((generator = generator.apply(__this, __arguments)).next());
+  });
+};
 (function() {
   "use strict";
   const A = window.A;
@@ -1715,185 +1819,191 @@ var __spreadProps = (a, b) => __defProps(a, __getOwnPropDescs(b));
     if (err && err.name === "AbortError") return "Stopped.";
     return err && err.message || "Something went wrong.";
   };
-  async function requestJson(url, options = {}) {
-    var _a;
-    const {
-      method = "POST",
-      headers = {},
-      body,
-      timeout = 45e3,
-      retries = 1,
-      provider = "",
-      signal
-    } = options;
-    let lastErr;
-    for (let attempt = 0; attempt <= retries; attempt++) {
+  function requestJson(_0) {
+    return __async(this, arguments, function* (url, options = {}) {
+      var _a;
+      const {
+        method = "POST",
+        headers = {},
+        body,
+        timeout = 45e3,
+        retries = 1,
+        provider = "",
+        signal
+      } = options;
+      let lastErr;
+      for (let attempt = 0; attempt <= retries; attempt++) {
+        const ctrl = new AbortController();
+        const timer = setTimeout(() => ctrl.abort(new NetError("timeout", { kind: "timeout", provider })), timeout);
+        const onAbort = () => ctrl.abort(signal.reason);
+        if (signal) signal.addEventListener("abort", onAbort, { once: true });
+        try {
+          const res = yield fetch(url, {
+            method,
+            headers: Object.assign({ "Content-Type": "application/json" }, headers),
+            body: body === void 0 ? void 0 : typeof body === "string" ? body : JSON.stringify(body),
+            signal: ctrl.signal,
+            cache: "no-store",
+            mode: "cors",
+            credentials: "omit"
+          });
+          clearTimeout(timer);
+          const text = yield res.text();
+          if (!res.ok) {
+            let detail = "";
+            try {
+              const j = JSON.parse(text);
+              detail = ((_a = j.error) == null ? void 0 : _a.message) || j.message || j.error || "";
+              if (typeof detail === "object") detail = JSON.stringify(detail);
+            } catch (_) {
+              detail = text.slice(0, 220);
+            }
+            const err = new NetError(detail || `HTTP ${res.status}`, {
+              status: res.status,
+              provider,
+              retryable: res.status === 429 || res.status >= 500
+            });
+            if (err.retryable && attempt < retries) {
+              lastErr = err;
+              yield sleep((res.status === 429 ? 2500 : 800) * (attempt + 1));
+              continue;
+            }
+            throw err;
+          }
+          try {
+            return JSON.parse(text);
+          } catch (_) {
+            return text;
+          }
+        } catch (err) {
+          clearTimeout(timer);
+          if (signal && signal.aborted) throw new DOMException("Aborted", "AbortError");
+          const normalized = err instanceof NetError ? err : err.name === "AbortError" ? new NetError("timeout", { kind: "timeout", provider, retryable: true }) : new NetError(err.message || "Network request failed", { provider, retryable: true });
+          if (attempt < retries && normalized.retryable) {
+            lastErr = normalized;
+            yield sleep(700 * (attempt + 1));
+            continue;
+          }
+          throw normalized;
+        } finally {
+          clearTimeout(timer);
+          if (signal) signal.removeEventListener("abort", onAbort);
+        }
+      }
+      throw lastErr || new NetError("Request failed", { provider });
+    });
+  }
+  function streamChat(opts) {
+    return __async(this, null, function* () {
+      var _a, _b, _c, _d, _e, _f, _g, _h;
+      const {
+        url,
+        headers = {},
+        body,
+        onDelta = () => {
+        },
+        timeout = 12e4,
+        provider = "",
+        signal
+      } = opts;
       const ctrl = new AbortController();
       const timer = setTimeout(() => ctrl.abort(new NetError("timeout", { kind: "timeout", provider })), timeout);
       const onAbort = () => ctrl.abort(signal.reason);
       if (signal) signal.addEventListener("abort", onAbort, { once: true });
       try {
-        const res = await fetch(url, {
-          method,
-          headers: Object.assign({ "Content-Type": "application/json" }, headers),
-          body: body === void 0 ? void 0 : typeof body === "string" ? body : JSON.stringify(body),
+        const res = yield fetch(url, {
+          method: "POST",
+          headers: Object.assign({ "Content-Type": "application/json", Accept: "text/event-stream" }, headers),
+          body: JSON.stringify(body),
           signal: ctrl.signal,
           cache: "no-store",
           mode: "cors",
           credentials: "omit"
         });
-        clearTimeout(timer);
-        const text = await res.text();
         if (!res.ok) {
+          const text = yield res.text().catch(() => "");
           let detail = "";
           try {
             const j = JSON.parse(text);
             detail = ((_a = j.error) == null ? void 0 : _a.message) || j.message || j.error || "";
-            if (typeof detail === "object") detail = JSON.stringify(detail);
           } catch (_) {
-            detail = text.slice(0, 220);
+            detail = text.slice(0, 240);
           }
-          const err = new NetError(detail || `HTTP ${res.status}`, {
-            status: res.status,
-            provider,
-            retryable: res.status === 429 || res.status >= 500
-          });
-          if (err.retryable && attempt < retries) {
-            lastErr = err;
-            await sleep((res.status === 429 ? 2500 : 800) * (attempt + 1));
-            continue;
+          throw new NetError(detail || `HTTP ${res.status}`, { status: res.status, provider, retryable: res.status >= 500 || res.status === 429 });
+        }
+        const ctype = (res.headers.get("content-type") || "").toLowerCase();
+        if (!res.body || ctype.includes("application/json") || !ctype.includes("event-stream") && !ctype.includes("text/plain")) {
+          const text = yield res.text();
+          let json = null;
+          try {
+            json = JSON.parse(text);
+          } catch (_) {
           }
-          throw err;
+          const full2 = (_h = (_g = (_d = (_c = (_b = json == null ? void 0 : json.choices) == null ? void 0 : _b[0]) == null ? void 0 : _c.message) == null ? void 0 : _d.content) != null ? _g : (_f = (_e = json == null ? void 0 : json.choices) == null ? void 0 : _e[0]) == null ? void 0 : _f.text) != null ? _h : text;
+          onDelta(full2, full2);
+          return { text: full2, usage: json == null ? void 0 : json.usage, model: json == null ? void 0 : json.model };
         }
-        try {
-          return JSON.parse(text);
-        } catch (_) {
-          return text;
+        const reader = res.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = "";
+        let full = "";
+        let usage = null;
+        let model = null;
+        const handleLine = (line) => {
+          var _a2, _b2, _c2, _d2, _e2, _f2;
+          const trimmed = line.trim();
+          if (!trimmed || trimmed.startsWith(":") || trimmed.startsWith("event:")) return;
+          if (!trimmed.startsWith("data:")) return;
+          const payload = trimmed.slice(5).trim();
+          if (!payload || payload === "[DONE]") return;
+          let json;
+          try {
+            json = JSON.parse(payload);
+          } catch (_) {
+            return;
+          }
+          if (json.error) throw new NetError(json.error.message || "stream error", { provider, status: 502 });
+          model = json.model || model;
+          usage = json.usage || usage;
+          const choice = (_a2 = json.choices) == null ? void 0 : _a2[0];
+          const delta = (_f2 = (_e2 = (_d2 = (_b2 = choice == null ? void 0 : choice.delta) == null ? void 0 : _b2.content) != null ? _d2 : (_c2 = choice == null ? void 0 : choice.message) == null ? void 0 : _c2.content) != null ? _e2 : choice == null ? void 0 : choice.text) != null ? _f2 : "";
+          if (delta) {
+            full += delta;
+            onDelta(delta, full);
+          }
+        };
+        while (true) {
+          const { done, value } = yield reader.read();
+          if (done) break;
+          buffer += decoder.decode(value, { stream: true });
+          let idx;
+          while ((idx = buffer.indexOf("\n")) >= 0) {
+            const line = buffer.slice(0, idx);
+            buffer = buffer.slice(idx + 1);
+            handleLine(line);
+          }
         }
-      } catch (err) {
-        clearTimeout(timer);
-        if (signal && signal.aborted) throw new DOMException("Aborted", "AbortError");
-        const normalized = err instanceof NetError ? err : err.name === "AbortError" ? new NetError("timeout", { kind: "timeout", provider, retryable: true }) : new NetError(err.message || "Network request failed", { provider, retryable: true });
-        if (attempt < retries && normalized.retryable) {
-          lastErr = normalized;
-          await sleep(700 * (attempt + 1));
-          continue;
-        }
-        throw normalized;
+        if (buffer.trim()) handleLine(buffer);
+        return { text: full, usage, model };
       } finally {
         clearTimeout(timer);
         if (signal) signal.removeEventListener("abort", onAbort);
       }
-    }
-    throw lastErr || new NetError("Request failed", { provider });
+    });
   }
-  async function streamChat(opts) {
-    var _a, _b, _c, _d, _e, _f, _g, _h;
-    const {
-      url,
-      headers = {},
-      body,
-      onDelta = () => {
-      },
-      timeout = 12e4,
-      provider = "",
-      signal
-    } = opts;
-    const ctrl = new AbortController();
-    const timer = setTimeout(() => ctrl.abort(new NetError("timeout", { kind: "timeout", provider })), timeout);
-    const onAbort = () => ctrl.abort(signal.reason);
-    if (signal) signal.addEventListener("abort", onAbort, { once: true });
-    try {
-      const res = await fetch(url, {
-        method: "POST",
-        headers: Object.assign({ "Content-Type": "application/json", Accept: "text/event-stream" }, headers),
-        body: JSON.stringify(body),
-        signal: ctrl.signal,
-        cache: "no-store",
-        mode: "cors",
-        credentials: "omit"
-      });
-      if (!res.ok) {
-        const text = await res.text().catch(() => "");
-        let detail = "";
-        try {
-          const j = JSON.parse(text);
-          detail = ((_a = j.error) == null ? void 0 : _a.message) || j.message || j.error || "";
-        } catch (_) {
-          detail = text.slice(0, 240);
-        }
-        throw new NetError(detail || `HTTP ${res.status}`, { status: res.status, provider, retryable: res.status >= 500 || res.status === 429 });
+  function probe(_0) {
+    return __async(this, arguments, function* (url, { timeout = 5e3, headers = {} } = {}) {
+      const started = performance.now();
+      try {
+        const ctrl = new AbortController();
+        const timer = setTimeout(() => ctrl.abort(), timeout);
+        yield fetch(url, { method: "GET", headers, signal: ctrl.signal, cache: "no-store", mode: "cors" });
+        clearTimeout(timer);
+        return { ok: true, ms: Math.round(performance.now() - started) };
+      } catch (err) {
+        return { ok: false, ms: Math.round(performance.now() - started), error: err.message };
       }
-      const ctype = (res.headers.get("content-type") || "").toLowerCase();
-      if (!res.body || ctype.includes("application/json") || !ctype.includes("event-stream") && !ctype.includes("text/plain")) {
-        const text = await res.text();
-        let json = null;
-        try {
-          json = JSON.parse(text);
-        } catch (_) {
-        }
-        const full2 = (_h = (_g = (_d = (_c = (_b = json == null ? void 0 : json.choices) == null ? void 0 : _b[0]) == null ? void 0 : _c.message) == null ? void 0 : _d.content) != null ? _g : (_f = (_e = json == null ? void 0 : json.choices) == null ? void 0 : _e[0]) == null ? void 0 : _f.text) != null ? _h : text;
-        onDelta(full2, full2);
-        return { text: full2, usage: json == null ? void 0 : json.usage, model: json == null ? void 0 : json.model };
-      }
-      const reader = res.body.getReader();
-      const decoder = new TextDecoder();
-      let buffer = "";
-      let full = "";
-      let usage = null;
-      let model = null;
-      const handleLine = (line) => {
-        var _a2, _b2, _c2, _d2, _e2, _f2;
-        const trimmed = line.trim();
-        if (!trimmed || trimmed.startsWith(":") || trimmed.startsWith("event:")) return;
-        if (!trimmed.startsWith("data:")) return;
-        const payload = trimmed.slice(5).trim();
-        if (!payload || payload === "[DONE]") return;
-        let json;
-        try {
-          json = JSON.parse(payload);
-        } catch (_) {
-          return;
-        }
-        if (json.error) throw new NetError(json.error.message || "stream error", { provider, status: 502 });
-        model = json.model || model;
-        usage = json.usage || usage;
-        const choice = (_a2 = json.choices) == null ? void 0 : _a2[0];
-        const delta = (_f2 = (_e2 = (_d2 = (_b2 = choice == null ? void 0 : choice.delta) == null ? void 0 : _b2.content) != null ? _d2 : (_c2 = choice == null ? void 0 : choice.message) == null ? void 0 : _c2.content) != null ? _e2 : choice == null ? void 0 : choice.text) != null ? _f2 : "";
-        if (delta) {
-          full += delta;
-          onDelta(delta, full);
-        }
-      };
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        buffer += decoder.decode(value, { stream: true });
-        let idx;
-        while ((idx = buffer.indexOf("\n")) >= 0) {
-          const line = buffer.slice(0, idx);
-          buffer = buffer.slice(idx + 1);
-          handleLine(line);
-        }
-      }
-      if (buffer.trim()) handleLine(buffer);
-      return { text: full, usage, model };
-    } finally {
-      clearTimeout(timer);
-      if (signal) signal.removeEventListener("abort", onAbort);
-    }
-  }
-  async function probe(url, { timeout = 5e3, headers = {} } = {}) {
-    const started = performance.now();
-    try {
-      const ctrl = new AbortController();
-      const timer = setTimeout(() => ctrl.abort(), timeout);
-      await fetch(url, { method: "GET", headers, signal: ctrl.signal, cache: "no-store", mode: "cors" });
-      clearTimeout(timer);
-      return { ok: true, ms: Math.round(performance.now() - started) };
-    } catch (err) {
-      return { ok: false, ms: Math.round(performance.now() - started), error: err.message };
-    }
+    });
   }
   A.net = {
     NetError,
@@ -1909,6 +2019,26 @@ var __spreadProps = (a, b) => __defProps(a, __getOwnPropDescs(b));
 
 </script>
 <script>
+var __async = (__this, __arguments, generator) => {
+  return new Promise((resolve, reject) => {
+    var fulfilled = (value) => {
+      try {
+        step(generator.next(value));
+      } catch (e) {
+        reject(e);
+      }
+    };
+    var rejected = (value) => {
+      try {
+        step(generator.throw(value));
+      } catch (e) {
+        reject(e);
+      }
+    };
+    var step = (x) => x.done ? resolve(x.value) : Promise.resolve(x.value).then(fulfilled, rejected);
+    step((generator = generator.apply(__this, __arguments)).next());
+  });
+};
 (function() {
   "use strict";
   const A = window.A;
@@ -1921,21 +2051,25 @@ var __spreadProps = (a, b) => __defProps(a, __getOwnPropDescs(b));
     return plugin || null;
   };
   const available = () => Boolean(native());
-  async function call(method, args = {}) {
-    const plugin = native();
-    if (!plugin) throw new Error("Phone control needs the Ai'sHub Android app. On the web this is not available.");
-    if (typeof plugin[method] !== "function") throw new Error(`This build does not expose "${method}". Update the app.`);
-    return plugin[method](args);
+  function call(_0) {
+    return __async(this, arguments, function* (method, args = {}) {
+      const plugin = native();
+      if (!plugin) throw new Error("Phone control needs the Ai'sHub Android app. On the web this is not available.");
+      if (typeof plugin[method] !== "function") throw new Error(`This build does not expose "${method}". Update the app.`);
+      return plugin[method](args);
+    });
   }
-  async function capabilities() {
-    if (!available()) {
-      return { platform: "web", features: {}, webLimitations: true };
-    }
-    try {
-      return await call("capabilities");
-    } catch (err) {
-      return { platform: "android", features: {}, error: err.message };
-    }
+  function capabilities() {
+    return __async(this, null, function* () {
+      if (!available()) {
+        return { platform: "web", features: {}, webLimitations: true };
+      }
+      try {
+        return yield call("capabilities");
+      } catch (err) {
+        return { platform: "android", features: {}, error: err.message };
+      }
+    });
   }
   A.phone = { available, call, capabilities, native };
 })();
@@ -1957,6 +2091,26 @@ var __spreadValues = (a, b) => {
         __defNormalProp(a, prop, b[prop]);
     }
   return a;
+};
+var __async = (__this, __arguments, generator) => {
+  return new Promise((resolve, reject) => {
+    var fulfilled = (value) => {
+      try {
+        step(generator.next(value));
+      } catch (e) {
+        reject(e);
+      }
+    };
+    var rejected = (value) => {
+      try {
+        step(generator.throw(value));
+      } catch (e) {
+        reject(e);
+      }
+    };
+    var step = (x) => x.done ? resolve(x.value) : Promise.resolve(x.value).then(fulfilled, rejected);
+    step((generator = generator.apply(__this, __arguments)).next());
+  });
 };
 (function() {
   "use strict";
@@ -2090,179 +2244,181 @@ var __spreadValues = (a, b) => {
     return m ? ` ${sep} ${m}` : "";
   };
   const clean = (text) => String(text).replace(/\s*\u2014\s*\./g, ".").replace(/\s+([.,])/g, "$1").trim();
-  async function perform(name, match, text) {
-    switch (name) {
-      case "alarm": {
-        const time = parseTime(text);
-        if (!time) return { ok: false, text: "Tell me the time, like “set an alarm for 7:30 am”." };
-        const label = (text.match(/\b(?:labell?ed|called|for)\s+([a-z0-9 '\-]{2,40})$/i) || [])[1];
-        const res = await A.phone.call("setAlarm", { hour: time.hour, minute: time.minute, label: (label == null ? void 0 : label.trim()) || "Ai'sHub alarm" });
-        return reply(clean(`Alarm set for ${String(time.hour).padStart(2, "0")}:${String(time.minute).padStart(2, "0")}${tail(res)}.`));
-      }
-      case "timer": {
-        const seconds = parseDuration(text);
-        if (!seconds) return { ok: false, text: "How long? Try “set a timer for 10 minutes”." };
-        const res = await A.phone.call("setTimer", { seconds, label: "Ai'sHub timer" });
-        return reply(clean(`Timer started${tail(res)}.`));
-      }
-      case "event": {
-        const title = (text.match(/\b(?:add|create|schedule|put)\s+(?:a\s+)?(?:meeting|event|appointment)\s*(?:called|for|titled|:)?\s*([^,.]+)/i) || [])[1];
-        const time = parseTime(text);
-        const begin = time ? nextOccurrence(time) : Date.now() + 36e5;
-        const res = await A.phone.call("createEvent", {
-          title: (title || "Ai'sHub event").trim(),
-          begin,
-          end: begin + 36e5
-        });
-        const when = new Date(begin).toLocaleString();
-        return reply(clean(`Opening your calendar to add “${(title || "Ai'sHub event").trim()}” for ${when}.${tail(res, "")}`));
-      }
-      case "agenda": {
-        const res = await A.phone.call("readEvents", {});
-        if (!res.events || !res.events.length) return reply("Your calendar has nothing scheduled from now on.");
-        const lines = res.events.slice(0, 8).map((e) => `- **${e.title || "Untitled"}** — ${new Date(e.start).toLocaleString()}${e.location ? ` · ${e.location}` : ""}`).join("\n");
-        return reply(`Here is what is coming up:
+  function perform(name, match, text) {
+    return __async(this, null, function* () {
+      switch (name) {
+        case "alarm": {
+          const time = parseTime(text);
+          if (!time) return { ok: false, text: "Tell me the time, like “set an alarm for 7:30 am”." };
+          const label = (text.match(/\b(?:labell?ed|called|for)\s+([a-z0-9 '\-]{2,40})$/i) || [])[1];
+          const res = yield A.phone.call("setAlarm", { hour: time.hour, minute: time.minute, label: (label == null ? void 0 : label.trim()) || "Ai'sHub alarm" });
+          return reply(clean(`Alarm set for ${String(time.hour).padStart(2, "0")}:${String(time.minute).padStart(2, "0")}${tail(res)}.`));
+        }
+        case "timer": {
+          const seconds = parseDuration(text);
+          if (!seconds) return { ok: false, text: "How long? Try “set a timer for 10 minutes”." };
+          const res = yield A.phone.call("setTimer", { seconds, label: "Ai'sHub timer" });
+          return reply(clean(`Timer started${tail(res)}.`));
+        }
+        case "event": {
+          const title = (text.match(/\b(?:add|create|schedule|put)\s+(?:a\s+)?(?:meeting|event|appointment)\s*(?:called|for|titled|:)?\s*([^,.]+)/i) || [])[1];
+          const time = parseTime(text);
+          const begin = time ? nextOccurrence(time) : Date.now() + 36e5;
+          const res = yield A.phone.call("createEvent", {
+            title: (title || "Ai'sHub event").trim(),
+            begin,
+            end: begin + 36e5
+          });
+          const when = new Date(begin).toLocaleString();
+          return reply(clean(`Opening your calendar to add “${(title || "Ai'sHub event").trim()}” for ${when}.${tail(res, "")}`));
+        }
+        case "agenda": {
+          const res = yield A.phone.call("readEvents", {});
+          if (!res.events || !res.events.length) return reply("Your calendar has nothing scheduled from now on.");
+          const lines = res.events.slice(0, 8).map((e) => `- **${e.title || "Untitled"}** — ${new Date(e.start).toLocaleString()}${e.location ? ` · ${e.location}` : ""}`).join("\n");
+          return reply(`Here is what is coming up:
 
 ${lines}`);
-      }
-      case "contact": {
-        const q = (text.match(/\b(?:contact|number|phone number)\s+(?:of|for|is)?\s*([a-z .'\-]{2,40})/i) || [])[1] || "";
-        const res = await A.phone.call("findContact", { query: q.trim() });
-        if (!res.contacts || !res.contacts.length) return reply(`I could not find a contact matching “${q.trim()}” on this phone.`);
-        const lines = res.contacts.map((c) => `- **${c.name}** — ${c.number}`).join("\n");
-        return reply(`Found ${res.count} match${res.count === 1 ? "" : "es"}:
+        }
+        case "contact": {
+          const q = (text.match(/\b(?:contact|number|phone number)\s+(?:of|for|is)?\s*([a-z .'\-]{2,40})/i) || [])[1] || "";
+          const res = yield A.phone.call("findContact", { query: q.trim() });
+          if (!res.contacts || !res.contacts.length) return reply(`I could not find a contact matching “${q.trim()}” on this phone.`);
+          const lines = res.contacts.map((c) => `- **${c.name}** — ${c.number}`).join("\n");
+          return reply(`Found ${res.count} match${res.count === 1 ? "" : "es"}:
 
 ${lines}`);
-      }
-      case "call": {
-        const number = extractNumber(text) || (text.match(/\bcall\s+(?:the\s+)?([a-z0-9 .'\-]{2,40})/i) || [])[1];
-        if (!number) return { ok: false, text: "Who should I call? Give me a name or a number." };
-        const res = await A.phone.call("call", { number: String(number).trim() });
-        return reply(clean(`Done${tail(res)}.`));
-      }
-      case "sms": {
-        const body = (text.match(/\b(?:saying|that says|with (?:the )?message)\s+(.+)$/i) || [])[1];
-        const target = (text.match(/\b(?:text|sms|message|whatsapp)\s+(?:to\s+)?([+()\d][\d\s()\-]{5,}|\d{5,})/i) || [])[1];
-        if (!target) return { ok: false, text: "Give me the number to text, like “text 01712345678 that I will be late”." };
-        const res = await A.phone.call("sms", { number: String(target).trim(), body: body || "" });
-        return reply(clean(`Message ready${tail(res)}.${body ? " Your message is filled in." : ""}`));
-      }
-      case "openApp": {
-        const raw = (match[2] || "").trim().toLowerCase();
-        const pkg = APP_ALIASES[raw] || (raw.includes(".") ? raw : null);
-        if (!pkg) {
-          const apps = await A.phone.call("listApps", {});
-          const hit = (apps.apps || []).find((a) => a.label.toLowerCase() === raw || a.label.toLowerCase().includes(raw));
-          if (!hit) return { ok: false, text: `I could not find an app called “${raw}” on this phone.` };
-          const res2 = await A.phone.call("openApp", { package: hit.package });
-          return reply(clean(`Opened **${hit.label}**.${tail(res2, "")}`));
         }
-        const res = await A.phone.call("openApp", { package: pkg });
-        return reply(`Opened **${raw}**.`);
-      }
-      case "settings": {
-        const which = (text.match(/\b(wifi|bluetooth|airplane|location|display|sound|battery|accessibility|data)\b/i) || [, "settings"])[1].toLowerCase();
-        if (/^(turn on|enable|turn off|disable)/i.test(text) && (which === "wifi" || which === "bluetooth")) {
-          const res2 = await A.phone.call("openSettings", { which });
-          return reply(`Android does not let apps flip ${which} directly, so I opened the ${which} settings for you — one tap there and it is on.`);
+        case "call": {
+          const number = extractNumber(text) || (text.match(/\bcall\s+(?:the\s+)?([a-z0-9 .'\-]{2,40})/i) || [])[1];
+          if (!number) return { ok: false, text: "Who should I call? Give me a name or a number." };
+          const res = yield A.phone.call("call", { number: String(number).trim() });
+          return reply(clean(`Done${tail(res)}.`));
         }
-        const res = await A.phone.call("openSettings", { which });
-        return reply(clean(`Done${tail(res)}.`));
-      }
-      case "torchOn": {
-        const res = await A.phone.call("torch", { on: true });
-        return reply(clean(`Flashlight on.${tail(res, "")}`));
-      }
-      case "torchOff": {
-        await A.phone.call("torch", { on: false });
-        return reply("Flashlight off.");
-      }
-      case "volume": {
-        const level = (text.match(/\b(?:volume|set)\D{0,8}(\d{1,2})\s*%?/i) || [])[1];
-        if (level) {
-          const max = (await A.phone.call("status", {})).volumeMax || 15;
-          const target = Math.round(Number(level) / 100 * max);
-          const res2 = await A.phone.call("volume", { level: Math.max(0, Math.min(max, target)) });
-          return reply(clean(`Volume set to about ${level}%.${tail(res2, "")}`));
+        case "sms": {
+          const body = (text.match(/\b(?:saying|that says|with (?:the )?message)\s+(.+)$/i) || [])[1];
+          const target = (text.match(/\b(?:text|sms|message|whatsapp)\s+(?:to\s+)?([+()\d][\d\s()\-]{5,}|\d{5,})/i) || [])[1];
+          if (!target) return { ok: false, text: "Give me the number to text, like “text 01712345678 that I will be late”." };
+          const res = yield A.phone.call("sms", { number: String(target).trim(), body: body || "" });
+          return reply(clean(`Message ready${tail(res)}.${body ? " Your message is filled in." : ""}`));
         }
-        const dir = /\b(down|lower|quieter|decrease|reduce)\b/i.test(text) ? "down" : /\b(mute|silent)\b/i.test(text) ? "mute" : "up";
-        const res = await A.phone.call("volume", { direction: dir });
-        return reply(clean(`Done${tail(res)}.`));
-      }
-      case "brightness": {
-        const pct = (text.match(/(\d{1,3})\s*%/i) || [])[1];
-        if (!pct) return reply("Say a level, like “set brightness to 40%”.");
-        const res = await A.phone.call("brightness", { level: Math.round(Number(pct) / 100 * 255) });
-        return reply(clean(`Done${tail(res)}.`));
-      }
-      case "clipboard": {
-        if (/\bcopy\b/i.test(text)) {
-          const what = text.replace(/^.*?\bcopy\b\s*/i, "").trim() || text;
-          await A.phone.call("clipboard", { text: what });
-          return reply(`Copied to your clipboard: “${what.slice(0, 80)}”.`);
+        case "openApp": {
+          const raw = (match[2] || "").trim().toLowerCase();
+          const pkg = APP_ALIASES[raw] || (raw.includes(".") ? raw : null);
+          if (!pkg) {
+            const apps = yield A.phone.call("listApps", {});
+            const hit = (apps.apps || []).find((a) => a.label.toLowerCase() === raw || a.label.toLowerCase().includes(raw));
+            if (!hit) return { ok: false, text: `I could not find an app called “${raw}” on this phone.` };
+            const res2 = yield A.phone.call("openApp", { package: hit.package });
+            return reply(clean(`Opened **${hit.label}**.${tail(res2, "")}`));
+          }
+          const res = yield A.phone.call("openApp", { package: pkg });
+          return reply(`Opened **${raw}**.`);
         }
-        const res = await A.phone.call("clipboard", {});
-        return reply(res.text ? `Your clipboard says:
+        case "settings": {
+          const which = (text.match(/\b(wifi|bluetooth|airplane|location|display|sound|battery|accessibility|data)\b/i) || [, "settings"])[1].toLowerCase();
+          if (/^(turn on|enable|turn off|disable)/i.test(text) && (which === "wifi" || which === "bluetooth")) {
+            const res2 = yield A.phone.call("openSettings", { which });
+            return reply(`Android does not let apps flip ${which} directly, so I opened the ${which} settings for you — one tap there and it is on.`);
+          }
+          const res = yield A.phone.call("openSettings", { which });
+          return reply(clean(`Done${tail(res)}.`));
+        }
+        case "torchOn": {
+          const res = yield A.phone.call("torch", { on: true });
+          return reply(clean(`Flashlight on.${tail(res, "")}`));
+        }
+        case "torchOff": {
+          yield A.phone.call("torch", { on: false });
+          return reply("Flashlight off.");
+        }
+        case "volume": {
+          const level = (text.match(/\b(?:volume|set)\D{0,8}(\d{1,2})\s*%?/i) || [])[1];
+          if (level) {
+            const max = (yield A.phone.call("status", {})).volumeMax || 15;
+            const target = Math.round(Number(level) / 100 * max);
+            const res2 = yield A.phone.call("volume", { level: Math.max(0, Math.min(max, target)) });
+            return reply(clean(`Volume set to about ${level}%.${tail(res2, "")}`));
+          }
+          const dir = /\b(down|lower|quieter|decrease|reduce)\b/i.test(text) ? "down" : /\b(mute|silent)\b/i.test(text) ? "mute" : "up";
+          const res = yield A.phone.call("volume", { direction: dir });
+          return reply(clean(`Done${tail(res)}.`));
+        }
+        case "brightness": {
+          const pct = (text.match(/(\d{1,3})\s*%/i) || [])[1];
+          if (!pct) return reply("Say a level, like “set brightness to 40%”.");
+          const res = yield A.phone.call("brightness", { level: Math.round(Number(pct) / 100 * 255) });
+          return reply(clean(`Done${tail(res)}.`));
+        }
+        case "clipboard": {
+          if (/\bcopy\b/i.test(text)) {
+            const what = text.replace(/^.*?\bcopy\b\s*/i, "").trim() || text;
+            yield A.phone.call("clipboard", { text: what });
+            return reply(`Copied to your clipboard: “${what.slice(0, 80)}”.`);
+          }
+          const res = yield A.phone.call("clipboard", {});
+          return reply(res.text ? `Your clipboard says:
 
 > ${res.text.slice(0, 500)}` : "Your clipboard is empty.");
-      }
-      case "battery": {
-        const s = await A.phone.call("status", {});
-        return reply(`Battery is at **${s.battery}%**.`);
-      }
-      case "storage": {
-        const s = await A.phone.call("status", {});
-        return reply(`You have **${s.storageFree}** free of ${s.storageTotal}.`);
-      }
-      case "status": {
-        const s = await A.phone.call("status", {});
-        const cap = await A.phone.capabilities();
-        return reply(
-          `**${cap.model || "This phone"}** · Android ${cap.androidVersion}
+        }
+        case "battery": {
+          const s = yield A.phone.call("status", {});
+          return reply(`Battery is at **${s.battery}%**.`);
+        }
+        case "storage": {
+          const s = yield A.phone.call("status", {});
+          return reply(`You have **${s.storageFree}** free of ${s.storageTotal}.`);
+        }
+        case "status": {
+          const s = yield A.phone.call("status", {});
+          const cap = yield A.phone.capabilities();
+          return reply(
+            `**${cap.model || "This phone"}** · Android ${cap.androidVersion}
 
 - Battery: ${s.battery}%
 - Volume: ${s.volume}/${s.volumeMax} (${s.ringerMode})
 - Storage free: ${s.storageFree} of ${s.storageTotal}
 - Network: ${s.operator || "unknown"}${s.wifi ? " · Wi-Fi on" : ""}
 - Time: ${s.time}`
-        );
-      }
-      case "share": {
-        const body = text.replace(/^.*?\bshare\b\s*/i, "").trim();
-        await A.phone.call("share", { text: body || text, title: "Share from Ai'sHub" });
-        return reply("Opened the share sheet.");
-      }
-      case "screenBack": {
-        await A.phone.call("screenAction", { action: "back" });
-        return reply("Went back.");
-      }
-      case "screenHome": {
-        await A.phone.call("screenAction", { action: "home" });
-        return reply("Home.");
-      }
-      case "screenRead": {
-        const res = await A.phone.call("screenAction", { action: "readScreen" });
-        return reply(res.text ? `On screen right now:
+          );
+        }
+        case "share": {
+          const body = text.replace(/^.*?\bshare\b\s*/i, "").trim();
+          yield A.phone.call("share", { text: body || text, title: "Share from Ai'sHub" });
+          return reply("Opened the share sheet.");
+        }
+        case "screenBack": {
+          yield A.phone.call("screenAction", { action: "back" });
+          return reply("Went back.");
+        }
+        case "screenHome": {
+          yield A.phone.call("screenAction", { action: "home" });
+          return reply("Home.");
+        }
+        case "screenRead": {
+          const res = yield A.phone.call("screenAction", { action: "readScreen" });
+          return reply(res.text ? `On screen right now:
 
 ${res.text}` : "The screen looks empty to me.");
+        }
+        case "screenTap": {
+          const label = (match[2] || "").trim();
+          yield A.phone.call("screenAction", { action: "tapText", text: label });
+          return reply(`Tapped “${label}”.`);
+        }
+        case "screenType": {
+          const value = (match[2] || "").trim().replace(/^["']|["']$/g, "");
+          yield A.phone.call("screenAction", { action: "type", text: value });
+          return reply(`Typed “${value.slice(0, 60)}”.`);
+        }
+        case "vibrate": {
+          yield A.phone.call("vibrate", { ms: 220 });
+          return reply("Buzzed.");
+        }
+        default:
+          return { ok: false, text: "I am not sure which phone action you meant." };
       }
-      case "screenTap": {
-        const label = (match[2] || "").trim();
-        await A.phone.call("screenAction", { action: "tapText", text: label });
-        return reply(`Tapped “${label}”.`);
-      }
-      case "screenType": {
-        const value = (match[2] || "").trim().replace(/^["']|["']$/g, "");
-        await A.phone.call("screenAction", { action: "type", text: value });
-        return reply(`Typed “${value.slice(0, 60)}”.`);
-      }
-      case "vibrate": {
-        await A.phone.call("vibrate", { ms: 220 });
-        return reply("Buzzed.");
-      }
-      default:
-        return { ok: false, text: "I am not sure which phone action you meant." };
-    }
+    });
   }
   function extractNumber(text) {
     const m = text.match(/(\+?\d[\d\s()\-]{6,}\d)/);
@@ -2274,27 +2430,29 @@ ${res.text}` : "The screen looks empty to me.");
     if (d.getTime() < Date.now()) d.setDate(d.getDate() + 1);
     return d.getTime();
   }
-  async function tryHandle(text) {
-    var _a;
-    const hit = detect(text);
-    if (!hit) return null;
-    if (!A.phone.available()) {
-      return {
-        ok: false,
-        text: "**Phone control needs the Ai'sHub Android app.** In the browser I can chat with you, but I cannot touch the phone itself.\n\nInstall the APK from your repo, then ask me again — alarms, calendar, apps, flashlight and taps all work there."
-      };
-    }
-    try {
-      const result = await perform(hit.name, hit.match, text);
-      log({ request: text, action: hit.name, ok: Boolean(result.ok), message: (_a = result.text) == null ? void 0 : _a.slice(0, 200) });
-      return result;
-    } catch (err) {
-      log({ request: text, action: hit.name, ok: false, message: err.message });
-      return {
-        ok: false,
-        text: `I could not do that: ${err.message}`
-      };
-    }
+  function tryHandle(text) {
+    return __async(this, null, function* () {
+      var _a;
+      const hit = detect(text);
+      if (!hit) return null;
+      if (!A.phone.available()) {
+        return {
+          ok: false,
+          text: "**Phone control needs the Ai'sHub Android app.** In the browser I can chat with you, but I cannot touch the phone itself.\n\nInstall the APK from your repo, then ask me again — alarms, calendar, apps, flashlight and taps all work there."
+        };
+      }
+      try {
+        const result = yield perform(hit.name, hit.match, text);
+        log({ request: text, action: hit.name, ok: Boolean(result.ok), message: (_a = result.text) == null ? void 0 : _a.slice(0, 200) });
+        return result;
+      } catch (err) {
+        log({ request: text, action: hit.name, ok: false, message: err.message });
+        return {
+          ok: false,
+          text: `I could not do that: ${err.message}`
+        };
+      }
+    });
   }
   A.phoneActions = { tryHandle, detect, looksLikePhoneRequest, parseTime, parseDuration, history, APP_ALIASES };
 })();
@@ -2788,6 +2946,26 @@ ${res.text}` : "The screen looks empty to me.");
 
 </script>
 <script>
+var __async = (__this, __arguments, generator) => {
+  return new Promise((resolve, reject) => {
+    var fulfilled = (value) => {
+      try {
+        step(generator.next(value));
+      } catch (e) {
+        reject(e);
+      }
+    };
+    var rejected = (value) => {
+      try {
+        step(generator.throw(value));
+      } catch (e) {
+        reject(e);
+      }
+    };
+    var step = (x) => x.done ? resolve(x.value) : Promise.resolve(x.value).then(fulfilled, rejected);
+    step((generator = generator.apply(__this, __arguments)).next());
+  });
+};
 (function() {
   "use strict";
   const A = window.A;
@@ -2874,115 +3052,121 @@ ${res.text}` : "The screen looks empty to me.");
     note: "",
     source: "discovered"
   });
-  async function discoverProvider(provider, { signal } = {}) {
-    if (provider.local || !provider.modelsPath) return [];
-    const url = baseUrlFor(provider).replace(/\/$/, "") + provider.modelsPath;
-    const payload = await requestJson(url, {
-      method: "GET",
-      headers: headersFor(provider),
-      timeout: 15e3,
-      retries: 0,
-      provider: provider.name,
-      signal
+  function discoverProvider(_0) {
+    return __async(this, arguments, function* (provider, { signal } = {}) {
+      if (provider.local || !provider.modelsPath) return [];
+      const url = baseUrlFor(provider).replace(/\/$/, "") + provider.modelsPath;
+      const payload = yield requestJson(url, {
+        method: "GET",
+        headers: headersFor(provider),
+        timeout: 15e3,
+        retries: 0,
+        provider: provider.name,
+        signal
+      });
+      return normalize(provider, payload);
     });
-    return normalize(provider, payload);
   }
-  async function syncAll({ force = false, signal, onProgress } = {}) {
-    if (syncing) return { skipped: true };
-    if (!online) return { offline: true, added: 0 };
-    syncing = true;
-    const summary = { added: 0, providers: {}, failures: [], newModels: [] };
-    try {
-      const known = new Set(A.catalog.models.map(A.catalog.keyFor));
-      const eligible = A.catalog.providers.filter(
-        (p) => !p.local && p.modelsPath && (p.keyless || A.settings.hasKey(p.id))
-      );
-      for (const provider of eligible) {
-        if (signal == null ? void 0 : signal.aborted) break;
-        onProgress == null ? void 0 : onProgress(provider.name);
-        try {
-          const list = await discoverProvider(provider, { signal });
-          if (!list.length) continue;
-          state.byProvider[provider.id] = list;
-          summary.providers[provider.id] = list.length;
-          for (const m of list) {
-            if (!known.has(A.catalog.keyFor(m))) {
-              known.add(A.catalog.keyFor(m));
-              summary.newModels.push(m);
-            } else {
-              const existing = A.catalog.find(A.catalog.keyFor(m));
-              if (existing && !existing.source_meta) {
-                existing.ctx = existing.ctx || m.ctx;
-                existing.free = existing.free || m.free;
-                existing.vision = existing.vision || m.vision;
-                existing.tools = existing.tools || m.tools;
-                existing.reasoning = existing.reasoning || m.reasoning;
+  function syncAll() {
+    return __async(this, arguments, function* ({ force = false, signal, onProgress } = {}) {
+      if (syncing) return { skipped: true };
+      if (!online) return { offline: true, added: 0 };
+      syncing = true;
+      const summary = { added: 0, providers: {}, failures: [], newModels: [] };
+      try {
+        const known = new Set(A.catalog.models.map(A.catalog.keyFor));
+        const eligible = A.catalog.providers.filter(
+          (p) => !p.local && p.modelsPath && (p.keyless || A.settings.hasKey(p.id))
+        );
+        for (const provider of eligible) {
+          if (signal == null ? void 0 : signal.aborted) break;
+          onProgress == null ? void 0 : onProgress(provider.name);
+          try {
+            const list = yield discoverProvider(provider, { signal });
+            if (!list.length) continue;
+            state.byProvider[provider.id] = list;
+            summary.providers[provider.id] = list.length;
+            for (const m of list) {
+              if (!known.has(A.catalog.keyFor(m))) {
+                known.add(A.catalog.keyFor(m));
+                summary.newModels.push(m);
+              } else {
+                const existing = A.catalog.find(A.catalog.keyFor(m));
+                if (existing && !existing.source_meta) {
+                  existing.ctx = existing.ctx || m.ctx;
+                  existing.free = existing.free || m.free;
+                  existing.vision = existing.vision || m.vision;
+                  existing.tools = existing.tools || m.tools;
+                  existing.reasoning = existing.reasoning || m.reasoning;
+                }
               }
+            }
+          } catch (err) {
+            summary.failures.push({ provider: provider.id, message: err.message });
+          }
+        }
+        summary.added = summary.newModels.length;
+        state.models = Object.values(state.byProvider).flat();
+        mergeIntoCatalog(summary.newModels);
+        state.lastSync = Date.now();
+        save();
+        if (summary.newModels.length) {
+          const seen = new Set(A.settings.get("seenModels") || []);
+          const fresh = summary.newModels.filter((m) => !seen.has(A.catalog.keyFor(m)));
+          const firstEver = !(A.settings.get("lastSync") || 0);
+          if (!firstEver) {
+            A.settings.set("seenModels", [...seen, ...summary.newModels.map(A.catalog.keyFor)]);
+            A.bus.emit("models:new", fresh.slice(0, 5));
+          } else {
+            markAllSeen();
+          }
+        }
+        A.settings.set("lastSync", Date.now());
+        A.bus.emit("models:synced", summary);
+        return summary;
+      } finally {
+        syncing = false;
+      }
+    });
+  }
+  function syncFeed() {
+    return __async(this, arguments, function* ({ signal } = {}) {
+      const feeds = A.settings.get("discoveryFeeds") || [];
+      let added = 0;
+      for (const url of feeds) {
+        try {
+          const data = yield requestJson(url, { method: "GET", timeout: 12e3, retries: 0, signal });
+          const rows = Array.isArray(data) ? data : (data == null ? void 0 : data.models) || [];
+          for (const row of rows) {
+            if (!(row == null ? void 0 : row.provider) || !(row == null ? void 0 : row.id)) continue;
+            if (!A.catalog.find(row.provider + ":" + row.id)) {
+              state.models.push({
+                id: row.id,
+                provider: row.provider,
+                name: row.name || prettify(row.id),
+                ctx: row.ctx || 0,
+                free: row.free !== false,
+                vision: !!row.vision,
+                tools: !!row.tools,
+                reasoning: !!row.reasoning,
+                offline: !!row.offline,
+                note: row.note || "",
+                source: "feed"
+              });
+              added++;
             }
           }
         } catch (err) {
-          summary.failures.push({ provider: provider.id, message: err.message });
+          console.warn("[discovery] feed failed", url, err.message);
         }
       }
-      summary.added = summary.newModels.length;
-      state.models = Object.values(state.byProvider).flat();
-      mergeIntoCatalog(summary.newModels);
-      state.lastSync = Date.now();
-      save();
-      if (summary.newModels.length) {
-        const seen = new Set(A.settings.get("seenModels") || []);
-        const fresh = summary.newModels.filter((m) => !seen.has(A.catalog.keyFor(m)));
-        const firstEver = !(A.settings.get("lastSync") || 0);
-        if (!firstEver) {
-          A.settings.set("seenModels", [...seen, ...summary.newModels.map(A.catalog.keyFor)]);
-          A.bus.emit("models:new", fresh.slice(0, 5));
-        } else {
-          markAllSeen();
-        }
+      if (added) {
+        state.lastSync = Date.now();
+        save();
+        A.bus.emit("models:synced", { added, feed: true });
       }
-      A.settings.set("lastSync", Date.now());
-      A.bus.emit("models:synced", summary);
-      return summary;
-    } finally {
-      syncing = false;
-    }
-  }
-  async function syncFeed({ signal } = {}) {
-    const feeds = A.settings.get("discoveryFeeds") || [];
-    let added = 0;
-    for (const url of feeds) {
-      try {
-        const data = await requestJson(url, { method: "GET", timeout: 12e3, retries: 0, signal });
-        const rows = Array.isArray(data) ? data : (data == null ? void 0 : data.models) || [];
-        for (const row of rows) {
-          if (!(row == null ? void 0 : row.provider) || !(row == null ? void 0 : row.id)) continue;
-          if (!A.catalog.find(row.provider + ":" + row.id)) {
-            state.models.push({
-              id: row.id,
-              provider: row.provider,
-              name: row.name || prettify(row.id),
-              ctx: row.ctx || 0,
-              free: row.free !== false,
-              vision: !!row.vision,
-              tools: !!row.tools,
-              reasoning: !!row.reasoning,
-              offline: !!row.offline,
-              note: row.note || "",
-              source: "feed"
-            });
-            added++;
-          }
-        }
-      } catch (err) {
-        console.warn("[discovery] feed failed", url, err.message);
-      }
-    }
-    if (added) {
-      state.lastSync = Date.now();
-      save();
-      A.bus.emit("models:synced", { added, feed: true });
-    }
-    return added;
+      return added;
+    });
   }
   function mergeIntoCatalog(models) {
     if (!Array.isArray(models) || !models.length) return;
@@ -3992,7 +4176,7 @@ Want another round? Ask for a *theme* — programmer, science, wordplay, or "roa
 Paste your text and tell me the language, and I'll do what this engine can — or switch me to a cloud model for full-quality translation.`, ["language"])
   ];
   const STOP = new Set("a an the is are was were be been being do does did have has had will would can could should may might must i you he she it we they me my your our their this that these those to of in on for with about from at by as and or but if then than so not no yes how what why when where who which".split(" "));
-  const tokens = (text = "") => text.toLowerCase().replace(/[^\p{L}\p{N}\s+#]/gu, " ").split(/\s+/).filter((w) => w && w.length > 1 && !STOP.has(w));
+  const tokens = (text = "") => text.toLowerCase().replace(A.util.notWordRe(), " ").split(/\s+/).filter((w) => w && w.length > 1 && !STOP.has(w));
   function stem(word = "") {
     let w = word.toLowerCase();
     if (w.length > 4 && w.endsWith("ies")) return w.slice(0, -3) + "y";
@@ -4035,6 +4219,26 @@ Paste your text and tell me the language, and I'll do what this engine can — o
 
 </script>
 <script>
+var __async = (__this, __arguments, generator) => {
+  return new Promise((resolve, reject) => {
+    var fulfilled = (value) => {
+      try {
+        step(generator.next(value));
+      } catch (e) {
+        reject(e);
+      }
+    };
+    var rejected = (value) => {
+      try {
+        step(generator.throw(value));
+      } catch (e) {
+        reject(e);
+      }
+    };
+    var step = (x) => x.done ? resolve(x.value) : Promise.resolve(x.value).then(fulfilled, rejected);
+    step((generator = generator.apply(__this, __arguments)).next());
+  });
+};
 (function() {
   "use strict";
   const A = window.A;
@@ -4597,7 +4801,7 @@ Total: **${rolls.reduce((a, b) => a + b, 0)}** (${n2}d${sides})`;
   function wordCountAnswer(text) {
     const body = text.replace(/^(word count|count words|how many words).*?[:]\s*/i, "").replace(/^(word count|count words|how many words.*)$/i, "");
     const sample = body.length > 3 ? body : text;
-    const words = (sample.match(/[\p{L}\p{N}'’-]+/gu) || []).length;
+    const words = (sample.match(A.util.wordRe()) || []).length;
     const chars = sample.length;
     const charsNoSpace = sample.replace(/\s/g, "").length;
     const sentences = (sample.match(/[.!?]+(?:\s|$)/g) || []).length || (sample.trim() ? 1 : 0);
@@ -5084,21 +5288,23 @@ Open **Models** to see what is connected right now.`;
     }
     return reply;
   }
-  async function chat({ messages, model = "aishub-core-1", onDelta = () => {
-  }, signal, web }) {
-    const reply = composeReply({ messages, model });
-    if (signal == null ? void 0 : signal.aborted) throw new DOMException("Aborted", "AbortError");
-    await sleep(180 + Math.random() * 260);
-    if (signal == null ? void 0 : signal.aborted) throw new DOMException("Aborted", "AbortError");
-    let out = "";
-    const chunks = reply.match(/[\s\S]{1,26}(\s|$)/g) || [reply];
-    for (const chunk of chunks) {
+  function chat(_0) {
+    return __async(this, arguments, function* ({ messages, model = "aishub-core-1", onDelta = () => {
+    }, signal, web }) {
+      const reply = composeReply({ messages, model });
       if (signal == null ? void 0 : signal.aborted) throw new DOMException("Aborted", "AbortError");
-      out += chunk;
-      onDelta(chunk, out);
-      await sleep(reply.length > 900 ? 8 : 14);
-    }
-    return { text: out };
+      yield sleep(180 + Math.random() * 260);
+      if (signal == null ? void 0 : signal.aborted) throw new DOMException("Aborted", "AbortError");
+      let out = "";
+      const chunks = reply.match(/[\s\S]{1,26}(\s|$)/g) || [reply];
+      for (const chunk of chunks) {
+        if (signal == null ? void 0 : signal.aborted) throw new DOMException("Aborted", "AbortError");
+        out += chunk;
+        onDelta(chunk, out);
+        yield sleep(reply.length > 900 ? 8 : 14);
+      }
+      return { text: out };
+    });
   }
   A.offlineEngine = {
     chat,
@@ -5137,6 +5343,26 @@ var __spreadValues = (a, b) => {
   return a;
 };
 var __spreadProps = (a, b) => __defProps(a, __getOwnPropDescs(b));
+var __async = (__this, __arguments, generator) => {
+  return new Promise((resolve, reject) => {
+    var fulfilled = (value) => {
+      try {
+        step(generator.next(value));
+      } catch (e) {
+        reject(e);
+      }
+    };
+    var rejected = (value) => {
+      try {
+        step(generator.throw(value));
+      } catch (e) {
+        reject(e);
+      }
+    };
+    var step = (x) => x.done ? resolve(x.value) : Promise.resolve(x.value).then(fulfilled, rejected);
+    step((generator = generator.apply(__this, __arguments)).next());
+  });
+};
 (function() {
   "use strict";
   const A = window.A;
@@ -5197,7 +5423,7 @@ var __spreadProps = (a, b) => __defProps(a, __getOwnPropDescs(b));
       icon: "calc",
       description: "Evaluate arithmetic, percentages and functions exactly.",
       params: { expression: "string — e.g. (1250*0.18)+40 or sqrt(144) or 15% of 240" },
-      run: async ({ expression }) => {
+      run: (_0) => __async(null, [_0], function* ({ expression }) {
         if (!expression) throw new Error("expression is required");
         let expr = String(expression);
         if (/%\s*of\s*/i.test(expr)) {
@@ -5205,7 +5431,7 @@ var __spreadProps = (a, b) => __defProps(a, __getOwnPropDescs(b));
         }
         const value = A.offlineEngine.evalMath(expr);
         return { value, formatted: value.toLocaleString("en-US", { maximumFractionDigits: 8 }) };
-      }
+      })
     },
     convert: {
       id: "convert",
@@ -5213,11 +5439,11 @@ var __spreadProps = (a, b) => __defProps(a, __getOwnPropDescs(b));
       icon: "swap",
       description: "Convert length, mass, volume, time, data, speed and temperature.",
       params: { value: "number", from: "unit", to: "unit" },
-      run: async ({ value, from, to }) => {
+      run: (_0) => __async(null, [_0], function* ({ value, from, to }) {
         const out = A.offlineEngine.convertUnits(Number(value), from, to);
         if (!out) throw new Error(`Cannot convert ${from} → ${to}`);
         return { result: out.value, unit: to, label: `${value} ${from} = ${out.value.toFixed(4).replace(/\.?0+$/, "")} ${to}` };
-      }
+      })
     },
     text_stats: {
       id: "text_stats",
@@ -5225,15 +5451,15 @@ var __spreadProps = (a, b) => __defProps(a, __getOwnPropDescs(b));
       icon: "text",
       description: "Count words, characters, sentences and estimate reading time.",
       params: { text: "string" },
-      run: async ({ text = "" }) => {
-        const words = (text.match(/[\p{L}\p{N}'’-]+/gu) || []).length;
+      run: (_0) => __async(null, [_0], function* ({ text = "" }) {
+        const words = (text.match(A.util.wordRe()) || []).length;
         return {
           words,
           characters: text.length,
           sentences: (text.match(/[.!?]+/g) || []).length,
           readingMinutes: Math.max(1, Math.round(words / 220))
         };
-      }
+      })
     },
     text_transform: {
       id: "text_transform",
@@ -5241,7 +5467,7 @@ var __spreadProps = (a, b) => __defProps(a, __getOwnPropDescs(b));
       icon: "sparkle",
       description: "Uppercase, lowercase, title case, slug, reverse, trim, dedupe lines.",
       params: { text: "string", mode: "upper|lower|title|slug|reverse|trim|dedupe" },
-      run: async ({ text = "", mode = "upper" }) => {
+      run: (_0) => __async(null, [_0], function* ({ text = "", mode = "upper" }) {
         const modes = {
           upper: () => text.toUpperCase(),
           lower: () => text.toLowerCase(),
@@ -5253,7 +5479,7 @@ var __spreadProps = (a, b) => __defProps(a, __getOwnPropDescs(b));
         };
         if (!modes[mode]) throw new Error(`Unknown mode "${mode}"`);
         return { result: modes[mode]() };
-      }
+      })
     },
     save_note: {
       id: "save_note",
@@ -5262,10 +5488,10 @@ var __spreadProps = (a, b) => __defProps(a, __getOwnPropDescs(b));
       description: "Save text to the device as a note (works offline, syncs nowhere).",
       mutates: true,
       params: { title: "string", body: "string" },
-      run: async ({ title = "Note", body = "" }) => {
+      run: (_0) => __async(null, [_0], function* ({ title = "Note", body = "" }) {
         const note = notes.save({ title: A.util.truncate(title, 80), body });
         return { saved: true, id: note.id, title: note.title };
-      }
+      })
     },
     list_notes: {
       id: "list_notes",
@@ -5273,10 +5499,10 @@ var __spreadProps = (a, b) => __defProps(a, __getOwnPropDescs(b));
       icon: "note",
       description: "List or search notes saved on this device.",
       params: { query: "string (optional)" },
-      run: async ({ query = "" } = {}) => {
+      run: (..._0) => __async(null, [..._0], function* ({ query = "" } = {}) {
         const list = notes.find(query).slice(0, 20);
         return { count: list.length, notes: list.map((n) => ({ id: n.id, title: n.title, preview: A.util.truncate((n.body || "").replace(/\n/g, " "), 120) })) };
-      }
+      })
     },
     remember: {
       id: "remember",
@@ -5285,11 +5511,11 @@ var __spreadProps = (a, b) => __defProps(a, __getOwnPropDescs(b));
       description: "Store a preference or fact for future conversations (local only).",
       mutates: true,
       params: { fact: "string" },
-      run: async ({ fact }) => {
+      run: (_0) => __async(null, [_0], function* ({ fact }) {
         if (!A.settings.get("memoryEnabled")) throw new Error("Memory is turned off in Settings");
         const item = memory.add(fact);
         return { stored: !!item, fact: item ? item.text : "already known" };
-      }
+      })
     },
     recall: {
       id: "recall",
@@ -5297,11 +5523,11 @@ var __spreadProps = (a, b) => __defProps(a, __getOwnPropDescs(b));
       icon: "memory",
       description: "Read stored facts and preferences.",
       params: { query: "string (optional)" },
-      run: async ({ query = "" } = {}) => {
+      run: (..._0) => __async(null, [..._0], function* ({ query = "" } = {}) {
         const q = String(query).toLowerCase();
         const list = memory.all().filter((m) => !q || m.text.toLowerCase().includes(q));
         return { count: list.length, facts: list.slice(0, 20).map((m) => m.text) };
-      }
+      })
     },
     date_math: {
       id: "date_math",
@@ -5309,7 +5535,7 @@ var __spreadProps = (a, b) => __defProps(a, __getOwnPropDescs(b));
       icon: "calendar",
       description: "Today, differences between dates, add/subtract days.",
       params: { op: "today|diff|add", date: "YYYY-MM-DD", date2: "YYYY-MM-DD", days: "number" },
-      run: async ({ op = "today", date, date2, days = 0 }) => {
+      run: (_0) => __async(null, [_0], function* ({ op = "today", date, date2, days = 0 }) {
         const now = /* @__PURE__ */ new Date();
         if (op === "today") {
           return {
@@ -5327,7 +5553,7 @@ var __spreadProps = (a, b) => __defProps(a, __getOwnPropDescs(b));
         }
         d1.setDate(d1.getDate() + Number(days));
         return { date: d1.toISOString().slice(0, 10), pretty: d1.toDateString() };
-      }
+      })
     },
     random: {
       id: "random",
@@ -5335,14 +5561,14 @@ var __spreadProps = (a, b) => __defProps(a, __getOwnPropDescs(b));
       icon: "dice",
       description: "Random number in a range, dice roll, or choose from a list.",
       params: { min: "number", max: "number", choices: "array (optional)" },
-      run: async ({ min = 1, max = 100, choices } = {}) => {
+      run: (..._0) => __async(null, [..._0], function* ({ min = 1, max = 100, choices } = {}) {
         if (Array.isArray(choices) && choices.length) {
           return { pick: choices[Math.floor(Math.random() * choices.length)] };
         }
         const lo = Math.min(Number(min), Number(max));
         const hi = Math.max(Number(min), Number(max));
         return { value: lo + Math.floor(Math.random() * (hi - lo + 1)), min: lo, max: hi };
-      }
+      })
     },
     knowledge: {
       id: "knowledge",
@@ -5350,14 +5576,14 @@ var __spreadProps = (a, b) => __defProps(a, __getOwnPropDescs(b));
       icon: "book",
       description: "Search the built-in offline knowledge base (science, code, writing, life).",
       params: { query: "string" },
-      run: async ({ query }) => {
+      run: (_0) => __async(null, [_0], function* ({ query }) {
         const hits = A.knowledge.search(query, 3);
         if (!hits.length) return { found: false, topics: [] };
         return {
           found: true,
           topics: hits.map((h) => ({ id: h.topic.id, title: h.topic.title, excerpt: A.util.truncate(h.topic.answer.replace(/[#*`>]/g, "").replace(/\n+/g, " "), 260) }))
         };
-      }
+      })
     },
     checklist: {
       id: "checklist",
@@ -5365,7 +5591,7 @@ var __spreadProps = (a, b) => __defProps(a, __getOwnPropDescs(b));
       icon: "check",
       description: "Turn a goal into an ordered, time-boxed checklist.",
       params: { goal: "string", days: "number (optional)" },
-      run: async ({ goal = "", days = 7 }) => {
+      run: (_0) => __async(null, [_0], function* ({ goal = "", days = 7 }) {
         const per = Math.max(1, Math.ceil(days / 4));
         const steps = [
           `Define "done" for: ${A.util.truncate(goal, 70)}`,
@@ -5375,7 +5601,7 @@ var __spreadProps = (a, b) => __defProps(a, __getOwnPropDescs(b));
           "Review: what shipped, what slipped, next step"
         ];
         return { goal, days, checklist: steps.map((s, i) => ({ n: i + 1, task: s, due: `day ${Math.min(days, (i + 1) * per)}` })) };
-      }
+      })
     }
   };
   const online = {
@@ -5386,11 +5612,11 @@ var __spreadProps = (a, b) => __defProps(a, __getOwnPropDescs(b));
       network: true,
       description: "Download a URL and return clean text (HTML tags stripped).",
       params: { url: "https://…" },
-      run: async ({ url }) => {
+      run: (_0) => __async(null, [_0], function* ({ url }) {
         if (!/^https?:\/\//i.test(url || "")) throw new Error("A full http(s) URL is required");
-        const res = await fetch(url, { mode: "cors", headers: { Accept: "text/html,application/json,text/plain" } });
+        const res = yield fetch(url, { mode: "cors", headers: { Accept: "text/html,application/json,text/plain" } });
         if (!res.ok) throw new Error("HTTP " + res.status);
-        const raw = await res.text();
+        const raw = yield res.text();
         const isJson = (res.headers.get("content-type") || "").includes("json");
         if (isJson) {
           const json = JSON.parse(raw);
@@ -5399,7 +5625,7 @@ var __spreadProps = (a, b) => __defProps(a, __getOwnPropDescs(b));
         const text = raw.replace(/<script[\s\S]*?<\/script>/gi, " ").replace(/<style[\s\S]*?<\/style>/gi, " ").replace(/<[^>]+>/g, " ").replace(/&nbsp;/g, " ").replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/\s+/g, " ").trim();
         const title = (raw.match(/<title[^>]*>([\s\S]*?)<\/title>/i) || [])[1] || url;
         return { url, title: title.trim().slice(0, 160), bytes: raw.length, text: text.slice(0, 6e3) };
-      }
+      })
     },
     json_api: {
       id: "json_api",
@@ -5408,16 +5634,16 @@ var __spreadProps = (a, b) => __defProps(a, __getOwnPropDescs(b));
       network: true,
       description: "GET/POST a JSON endpoint and return a trimmed response.",
       params: { url: "https://…", method: "GET|POST", body: "object (optional)" },
-      run: async ({ url, method = "GET", body }) => {
+      run: (_0) => __async(null, [_0], function* ({ url, method = "GET", body }) {
         if (!/^https?:\/\//i.test(url || "")) throw new Error("A full http(s) URL is required");
-        const res = await fetch(url, {
+        const res = yield fetch(url, {
           method,
           headers: { "Content-Type": "application/json" },
           body: method === "GET" ? void 0 : JSON.stringify(body || {})
         });
-        const text = await res.text();
+        const text = yield res.text();
         return { status: res.status, ok: res.ok, body: text.slice(0, 6e3) };
-      }
+      })
     },
     timer_note: {
       id: "timer_note",
@@ -5426,14 +5652,14 @@ var __spreadProps = (a, b) => __defProps(a, __getOwnPropDescs(b));
       description: "Create an in-app reminder that shows a toast at a set time.",
       mutates: true,
       params: { minutes: "number", text: "string" },
-      run: async ({ minutes = 5, text = "Reminder" }) => {
+      run: (_0) => __async(null, [_0], function* ({ minutes = 5, text = "Reminder" }) {
         const list = KV.get("reminders", []);
         const at = Date.now() + Number(minutes) * 6e4;
         const item = { id: A.util.uid("r_"), at, text };
         KV.set("reminders", [...list, item].slice(-30));
         A.skills.scheduleReminder(item);
         return { scheduled: true, at: new Date(at).toLocaleTimeString(), text };
-      }
+      })
     }
   };
   const all = __spreadValues(__spreadValues({}, local), online);
@@ -5453,18 +5679,20 @@ var __spreadProps = (a, b) => __defProps(a, __getOwnPropDescs(b));
     due.forEach(scheduleReminder);
     KV.set("reminders", due);
   }
-  async function run(name, params = {}, { signal } = {}) {
-    const skill = all[name];
-    if (!skill) throw new Error(`Unknown skill "${name}"`);
-    if (skill.network && !A.net.online) throw new Error(`"${skill.title}" needs a connection`);
-    try {
-      const output = await skill.run(params, { signal });
-      logRun(name, params, JSON.stringify(output).slice(0, 300), true);
-      return output;
-    } catch (err) {
-      logRun(name, params, err.message, false);
-      throw err;
-    }
+  function run(_0) {
+    return __async(this, arguments, function* (name, params = {}, { signal } = {}) {
+      const skill = all[name];
+      if (!skill) throw new Error(`Unknown skill "${name}"`);
+      if (skill.network && !A.net.online) throw new Error(`"${skill.title}" needs a connection`);
+      try {
+        const output = yield skill.run(params, { signal });
+        logRun(name, params, JSON.stringify(output).slice(0, 300), true);
+        return output;
+      } catch (err) {
+        logRun(name, params, err.message, false);
+        throw err;
+      }
+    });
   }
   A.skills = {
     local,
@@ -5515,6 +5743,26 @@ var __spreadValues = (a, b) => {
   return a;
 };
 var __spreadProps = (a, b) => __defProps(a, __getOwnPropDescs(b));
+var __async = (__this, __arguments, generator) => {
+  return new Promise((resolve, reject) => {
+    var fulfilled = (value) => {
+      try {
+        step(generator.next(value));
+      } catch (e) {
+        reject(e);
+      }
+    };
+    var rejected = (value) => {
+      try {
+        step(generator.throw(value));
+      } catch (e) {
+        reject(e);
+      }
+    };
+    var step = (x) => x.done ? resolve(x.value) : Promise.resolve(x.value).then(fulfilled, rejected);
+    step((generator = generator.apply(__this, __arguments)).next());
+  });
+};
 (function() {
   "use strict";
   const A = window.A;
@@ -5566,55 +5814,59 @@ ${out[0].content}`;
     }
     return out;
   }
-  async function complete({ provider, modelId, messages, system, signal, onDelta, temperature, maxTokens, jsonMode }) {
-    var _a, _b, _c, _d, _e, _f, _g, _h, _i;
-    const url = endpointFor(provider);
-    const body = {
-      model: modelId,
-      messages: transformMessages(provider, messages, system),
-      stream: Boolean(onDelta) && provider.stream !== false,
-      temperature: typeof temperature === "number" ? temperature : A.settings.get("temperature")
-    };
-    if (maxTokens) body.max_tokens = maxTokens;
-    if (jsonMode) body.response_format = { type: "json_object" };
-    if (!body.stream) {
-      const json = await A.net.requestJson(url, {
-        method: "POST",
+  function complete(_0) {
+    return __async(this, arguments, function* ({ provider, modelId, messages, system, signal, onDelta, temperature, maxTokens, jsonMode }) {
+      var _a, _b, _c, _d, _e, _f, _g, _h, _i;
+      const url = endpointFor(provider);
+      const body = {
+        model: modelId,
+        messages: transformMessages(provider, messages, system),
+        stream: Boolean(onDelta) && provider.stream !== false,
+        temperature: typeof temperature === "number" ? temperature : A.settings.get("temperature")
+      };
+      if (maxTokens) body.max_tokens = maxTokens;
+      if (jsonMode) body.response_format = { type: "json_object" };
+      if (!body.stream) {
+        const json = yield A.net.requestJson(url, {
+          method: "POST",
+          headers: headersFor(provider),
+          body,
+          provider: provider.name,
+          signal,
+          timeout: 9e4,
+          retries: 1
+        });
+        const text = (_i = (_h = (_f = (_c = (_b = (_a = json == null ? void 0 : json.choices) == null ? void 0 : _a[0]) == null ? void 0 : _b.message) == null ? void 0 : _c.content) != null ? _f : (_e = (_d = json == null ? void 0 : json.choices) == null ? void 0 : _d[0]) == null ? void 0 : _e.text) != null ? _h : (_g = json == null ? void 0 : json.output) == null ? void 0 : _g.text) != null ? _i : typeof json === "string" ? json : "";
+        return { text: String(text || ""), usage: json == null ? void 0 : json.usage, model: json == null ? void 0 : json.model, provider: provider.id };
+      }
+      const res = yield A.net.streamChat({
+        url,
         headers: headersFor(provider),
         body,
         provider: provider.name,
         signal,
-        timeout: 9e4,
-        retries: 1
+        timeout: 18e4,
+        onDelta
       });
-      const text = (_i = (_h = (_f = (_c = (_b = (_a = json == null ? void 0 : json.choices) == null ? void 0 : _a[0]) == null ? void 0 : _b.message) == null ? void 0 : _c.content) != null ? _f : (_e = (_d = json == null ? void 0 : json.choices) == null ? void 0 : _d[0]) == null ? void 0 : _e.text) != null ? _h : (_g = json == null ? void 0 : json.output) == null ? void 0 : _g.text) != null ? _i : typeof json === "string" ? json : "";
-      return { text: String(text || ""), usage: json == null ? void 0 : json.usage, model: json == null ? void 0 : json.model, provider: provider.id };
-    }
-    const res = await A.net.streamChat({
-      url,
-      headers: headersFor(provider),
-      body,
-      provider: provider.name,
-      signal,
-      timeout: 18e4,
-      onDelta
+      return __spreadProps(__spreadValues({}, res), { provider: provider.id });
     });
-    return __spreadProps(__spreadValues({}, res), { provider: provider.id });
   }
-  async function check(provider) {
-    try {
-      const base = A.discovery.baseUrlFor(provider).replace(/\/$/, "");
-      await A.net.requestJson(base + (provider.modelsPath || "/models"), {
-        method: "GET",
-        headers: headersFor(provider),
-        timeout: 12e3,
-        retries: 0,
-        provider: provider.name
-      });
-      return { ok: true };
-    } catch (err) {
-      return { ok: false, message: A.net.friendlyMessage(err, provider.name), status: err.status || 0 };
-    }
+  function check(provider) {
+    return __async(this, null, function* () {
+      try {
+        const base = A.discovery.baseUrlFor(provider).replace(/\/$/, "");
+        yield A.net.requestJson(base + (provider.modelsPath || "/models"), {
+          method: "GET",
+          headers: headersFor(provider),
+          timeout: 12e3,
+          retries: 0,
+          provider: provider.name
+        });
+        return { ok: true };
+      } catch (err) {
+        return { ok: false, message: A.net.friendlyMessage(err, provider.name), status: err.status || 0 };
+      }
+    });
   }
   A.providerClient = { complete, check, headersFor, endpointFor };
 })();
@@ -5640,6 +5892,26 @@ var __spreadValues = (a, b) => {
   return a;
 };
 var __spreadProps = (a, b) => __defProps(a, __getOwnPropDescs(b));
+var __async = (__this, __arguments, generator) => {
+  return new Promise((resolve, reject) => {
+    var fulfilled = (value) => {
+      try {
+        step(generator.next(value));
+      } catch (e) {
+        reject(e);
+      }
+    };
+    var rejected = (value) => {
+      try {
+        step(generator.throw(value));
+      } catch (e) {
+        reject(e);
+      }
+    };
+    var step = (x) => x.done ? resolve(x.value) : Promise.resolve(x.value).then(fulfilled, rejected);
+    step((generator = generator.apply(__this, __arguments)).next());
+  });
+};
 (function() {
   "use strict";
   const A = window.A;
@@ -5685,60 +5957,62 @@ var __spreadProps = (a, b) => __defProps(a, __getOwnPropDescs(b));
     }
     return ladder;
   }
-  async function chat({ messages, model, system, onDelta, signal, noFallback = false, onFallback, temperature, maxTokens }) {
-    const target = model || resolveSelected();
-    const sys = system !== void 0 ? system : buildSystemPrompt();
-    if (isLocal(target)) {
-      const res = await A.offlineEngine.chat({ messages, model: (target == null ? void 0 : target.id) || "aishub-core-1", onDelta, signal });
-      return __spreadProps(__spreadValues({}, res), { model: (target == null ? void 0 : target.id) || "aishub-core-1", provider: "local", usedFallback: false });
-    }
-    const provider = A.catalog.providerById(target.provider);
-    try {
-      const res = await A.providerClient.complete({
-        provider,
-        modelId: target.id,
-        messages,
-        system: sys,
-        signal,
-        onDelta,
-        temperature,
-        maxTokens
-      });
-      if (!res.text || !res.text.trim()) throw new A.net.NetError("Empty response from provider", { provider: provider.name });
-      return __spreadProps(__spreadValues({}, res), { model: target.id, provider: target.provider, usedFallback: false });
-    } catch (err) {
-      if (signal == null ? void 0 : signal.aborted) throw err;
-      const recoverable = !(err && err.kind === "config") && !(err.status === 401 || err.status === 403);
-      if (noFallback || !recoverable) throw err;
-      const chain = fallbackChain(target);
-      for (const alt of chain) {
-        if (signal == null ? void 0 : signal.aborted) throw err;
-        onFallback == null ? void 0 : onFallback({ from: target, to: alt, reason: A.net.friendlyMessage(err, provider == null ? void 0 : provider.name) });
-        try {
-          if (isLocal(alt)) {
-            const res2 = await A.offlineEngine.chat({ messages, model: alt.id, onDelta, signal });
-            return __spreadProps(__spreadValues({}, res2), { model: alt.id, provider: "local", usedFallback: true, fallbackFrom: target });
-          }
-          const altProvider = A.catalog.providerById(alt.provider);
-          const res = await A.providerClient.complete({
-            provider: altProvider,
-            modelId: alt.id,
-            messages,
-            system: sys,
-            signal,
-            onDelta,
-            temperature,
-            maxTokens
-          });
-          if (!res.text || !res.text.trim()) throw new A.net.NetError("Empty response", { provider: altProvider.name });
-          return __spreadProps(__spreadValues({}, res), { model: alt.id, provider: alt.provider, usedFallback: true, fallbackFrom: target });
-        } catch (e2) {
-          if (signal == null ? void 0 : signal.aborted) throw err;
-          continue;
-        }
+  function chat(_0) {
+    return __async(this, arguments, function* ({ messages, model, system, onDelta, signal, noFallback = false, onFallback, temperature, maxTokens }) {
+      const target = model || resolveSelected();
+      const sys = system !== void 0 ? system : buildSystemPrompt();
+      if (isLocal(target)) {
+        const res = yield A.offlineEngine.chat({ messages, model: (target == null ? void 0 : target.id) || "aishub-core-1", onDelta, signal });
+        return __spreadProps(__spreadValues({}, res), { model: (target == null ? void 0 : target.id) || "aishub-core-1", provider: "local", usedFallback: false });
       }
-      throw err;
-    }
+      const provider = A.catalog.providerById(target.provider);
+      try {
+        const res = yield A.providerClient.complete({
+          provider,
+          modelId: target.id,
+          messages,
+          system: sys,
+          signal,
+          onDelta,
+          temperature,
+          maxTokens
+        });
+        if (!res.text || !res.text.trim()) throw new A.net.NetError("Empty response from provider", { provider: provider.name });
+        return __spreadProps(__spreadValues({}, res), { model: target.id, provider: target.provider, usedFallback: false });
+      } catch (err) {
+        if (signal == null ? void 0 : signal.aborted) throw err;
+        const recoverable = !(err && err.kind === "config") && !(err.status === 401 || err.status === 403);
+        if (noFallback || !recoverable) throw err;
+        const chain = fallbackChain(target);
+        for (const alt of chain) {
+          if (signal == null ? void 0 : signal.aborted) throw err;
+          onFallback == null ? void 0 : onFallback({ from: target, to: alt, reason: A.net.friendlyMessage(err, provider == null ? void 0 : provider.name) });
+          try {
+            if (isLocal(alt)) {
+              const res2 = yield A.offlineEngine.chat({ messages, model: alt.id, onDelta, signal });
+              return __spreadProps(__spreadValues({}, res2), { model: alt.id, provider: "local", usedFallback: true, fallbackFrom: target });
+            }
+            const altProvider = A.catalog.providerById(alt.provider);
+            const res = yield A.providerClient.complete({
+              provider: altProvider,
+              modelId: alt.id,
+              messages,
+              system: sys,
+              signal,
+              onDelta,
+              temperature,
+              maxTokens
+            });
+            if (!res.text || !res.text.trim()) throw new A.net.NetError("Empty response", { provider: altProvider.name });
+            return __spreadProps(__spreadValues({}, res), { model: alt.id, provider: alt.provider, usedFallback: true, fallbackFrom: target });
+          } catch (e2) {
+            if (signal == null ? void 0 : signal.aborted) throw err;
+            continue;
+          }
+        }
+        throw err;
+      }
+    });
   }
   function buildSystemPrompt() {
     const custom = (A.settings.get("systemPrompt") || "").trim();
@@ -5755,30 +6029,52 @@ var __spreadProps = (a, b) => __defProps(a, __getOwnPropDescs(b));
     if (custom) parts.push("User instructions:\n" + custom);
     return parts.join("\n\n");
   }
-  async function testModel(modelKey) {
-    const model = A.catalog.find(modelKey);
-    const r = readiness(model);
-    if (!r.ready && !isLocal(model)) return { ok: false, message: r.reason };
-    try {
-      const res = await chat({
-        messages: [{ role: "user", content: "Reply with exactly: OK" }],
-        model,
-        onDelta: null,
-        noFallback: true,
-        maxTokens: 12,
-        temperature: 0,
-        signal: AbortSignal.timeout ? AbortSignal.timeout(3e4) : void 0
-      });
-      return { ok: true, text: res.text.trim().slice(0, 60), provider: res.provider, model: res.model };
-    } catch (err) {
-      return { ok: false, message: A.net.friendlyMessage(err, A.catalog.providerName(model.provider)) };
-    }
+  function testModel(modelKey) {
+    return __async(this, null, function* () {
+      const model = A.catalog.find(modelKey);
+      const r = readiness(model);
+      if (!r.ready && !isLocal(model)) return { ok: false, message: r.reason };
+      try {
+        const res = yield chat({
+          messages: [{ role: "user", content: "Reply with exactly: OK" }],
+          model,
+          onDelta: null,
+          noFallback: true,
+          maxTokens: 12,
+          temperature: 0,
+          signal: AbortSignal.timeout ? AbortSignal.timeout(3e4) : void 0
+        });
+        return { ok: true, text: res.text.trim().slice(0, 60), provider: res.provider, model: res.model };
+      } catch (err) {
+        return { ok: false, message: A.net.friendlyMessage(err, A.catalog.providerName(model.provider)) };
+      }
+    });
   }
   A.ai = { chat, readiness, resolveSelected, isLocal, fallbackChain, buildSystemPrompt, testModel, LOCAL_PREFIX };
 })();
 
 </script>
 <script>
+var __async = (__this, __arguments, generator) => {
+  return new Promise((resolve, reject) => {
+    var fulfilled = (value) => {
+      try {
+        step(generator.next(value));
+      } catch (e) {
+        reject(e);
+      }
+    };
+    var rejected = (value) => {
+      try {
+        step(generator.throw(value));
+      } catch (e) {
+        reject(e);
+      }
+    };
+    var step = (x) => x.done ? resolve(x.value) : Promise.resolve(x.value).then(fulfilled, rejected);
+    step((generator = generator.apply(__this, __arguments)).next());
+  });
+};
 (function() {
   "use strict";
   const A = window.A;
@@ -5947,15 +6243,15 @@ var __spreadProps = (a, b) => __defProps(a, __getOwnPropDescs(b));
   function bindCopy(container) {
     if (container.__copyBound) return;
     container.__copyBound = true;
-    container.addEventListener("click", async (e) => {
+    container.addEventListener("click", (e) => __async(null, null, function* () {
       const btn = e.target.closest("[data-copy]");
       if (!btn) return;
       const text = decodeURIComponent(btn.getAttribute("data-copy"));
-      const ok = await A.util.copyText(text);
+      const ok = yield A.util.copyText(text);
       const original = btn.textContent;
       btn.textContent = ok ? "Copied" : "Failed";
       setTimeout(() => btn.textContent = original, 1400);
-    });
+    }));
   }
   A.markdown = { render, inline, bindCopy };
 })();
@@ -5981,6 +6277,26 @@ var __spreadValues = (a, b) => {
   return a;
 };
 var __spreadProps = (a, b) => __defProps(a, __getOwnPropDescs(b));
+var __async = (__this, __arguments, generator) => {
+  return new Promise((resolve, reject) => {
+    var fulfilled = (value) => {
+      try {
+        step(generator.next(value));
+      } catch (e) {
+        reject(e);
+      }
+    };
+    var rejected = (value) => {
+      try {
+        step(generator.throw(value));
+      } catch (e) {
+        reject(e);
+      }
+    };
+    var step = (x) => x.done ? resolve(x.value) : Promise.resolve(x.value).then(fulfilled, rejected);
+    step((generator = generator.apply(__this, __arguments)).next());
+  });
+};
 (function() {
   "use strict";
   const A = window.A;
@@ -6019,50 +6335,60 @@ var __spreadProps = (a, b) => __defProps(a, __getOwnPropDescs(b));
     A.bus.emit("chats:changed", chats);
     return chats.find((c) => c.id === id);
   }
-  async function messages(chatId) {
-    const all = await DB.getMessages(chatId);
-    return all.filter((m) => !m.deleted);
-  }
-  async function deleteFrom(chatId, fromTs) {
-    const all = await DB.getMessages(chatId);
-    for (const m of all.filter((x) => x.ts >= fromTs)) {
-      await DB.deleteMessage(chatId, m.id);
-      await DB.putMessage(chatId, { id: m.id, chatId, deleted: true, ts: m.ts, role: "system", content: "" }).catch(() => {
-      });
-    }
-    const mirror = KV.get("msgs:" + chatId, []).filter((m) => m.ts < fromTs);
-    KV.set("msgs:" + chatId, mirror);
-  }
-  async function append(chatId, message) {
-    const msg = __spreadValues({ id: message.id || uid("m_"), ts: message.ts || Date.now() }, message);
-    const existing = await DB.getMessages(chatId);
-    await DB.putMessage(chatId, msg);
-    const light = (m) => __spreadProps(__spreadValues({}, m), {
-      attachments: m.attachments ? m.attachments.map((a) => ({ kind: a.kind, name: a.name })) : void 0
+  function messages(chatId) {
+    return __async(this, null, function* () {
+      const all = yield DB.getMessages(chatId);
+      return all.filter((m) => !m.deleted);
     });
-    KV.set("msgs:" + chatId, [...existing, msg].slice(-200).map(light));
-    const chat = get(chatId);
-    const patch = { messageCount: existing.length + 1 };
-    if (chat && (chat.messageCount || 0) === 0 && msg.role === "user") {
-      patch.title = titleFrom(typeof msg.content === "string" ? msg.content : "New chat");
-    }
-    touch(chatId, patch);
-    return msg;
   }
-  async function update(chatId, messageId, patch) {
-    const list_ = await DB.getMessages(chatId);
-    const idx = list_.findIndex((m) => m.id === messageId);
-    if (idx < 0) return null;
-    const updated = __spreadValues(__spreadValues({}, list_[idx]), patch);
-    await DB.putMessage(chatId, updated);
-    list_[idx] = updated;
-    KV.set("msgs:" + chatId, list_.slice(-200));
-    return updated;
+  function deleteFrom(chatId, fromTs) {
+    return __async(this, null, function* () {
+      const all = yield DB.getMessages(chatId);
+      for (const m of all.filter((x) => x.ts >= fromTs)) {
+        yield DB.deleteMessage(chatId, m.id);
+        yield DB.putMessage(chatId, { id: m.id, chatId, deleted: true, ts: m.ts, role: "system", content: "" }).catch(() => {
+        });
+      }
+      const mirror = KV.get("msgs:" + chatId, []).filter((m) => m.ts < fromTs);
+      KV.set("msgs:" + chatId, mirror);
+    });
   }
-  async function remove(chatId) {
-    await DB.deleteChat(chatId);
-    saveIndex(list().filter((c) => c.id !== chatId));
-    A.bus.emit("chats:changed", list());
+  function append(chatId, message) {
+    return __async(this, null, function* () {
+      const msg = __spreadValues({ id: message.id || uid("m_"), ts: message.ts || Date.now() }, message);
+      const existing = yield DB.getMessages(chatId);
+      yield DB.putMessage(chatId, msg);
+      const light = (m) => __spreadProps(__spreadValues({}, m), {
+        attachments: m.attachments ? m.attachments.map((a) => ({ kind: a.kind, name: a.name })) : void 0
+      });
+      KV.set("msgs:" + chatId, [...existing, msg].slice(-200).map(light));
+      const chat = get(chatId);
+      const patch = { messageCount: existing.length + 1 };
+      if (chat && (chat.messageCount || 0) === 0 && msg.role === "user") {
+        patch.title = titleFrom(typeof msg.content === "string" ? msg.content : "New chat");
+      }
+      touch(chatId, patch);
+      return msg;
+    });
+  }
+  function update(chatId, messageId, patch) {
+    return __async(this, null, function* () {
+      const list_ = yield DB.getMessages(chatId);
+      const idx = list_.findIndex((m) => m.id === messageId);
+      if (idx < 0) return null;
+      const updated = __spreadValues(__spreadValues({}, list_[idx]), patch);
+      yield DB.putMessage(chatId, updated);
+      list_[idx] = updated;
+      KV.set("msgs:" + chatId, list_.slice(-200));
+      return updated;
+    });
+  }
+  function remove(chatId) {
+    return __async(this, null, function* () {
+      yield DB.deleteChat(chatId);
+      saveIndex(list().filter((c) => c.id !== chatId));
+      A.bus.emit("chats:changed", list());
+    });
   }
   function clearAll() {
     saveIndex([]);
@@ -6076,16 +6402,20 @@ var __spreadProps = (a, b) => __defProps(a, __getOwnPropDescs(b));
     if (!q) return chats;
     return chats.filter((c) => c.title.toLowerCase().includes(q));
   }
-  async function exportChat(chatId) {
-    const chat = get(chatId);
-    const msgs = await messages(chatId);
-    return { chat, messages: msgs, exportedAt: (/* @__PURE__ */ new Date()).toISOString(), app: "Ai'sHub " + A.VERSION };
+  function exportChat(chatId) {
+    return __async(this, null, function* () {
+      const chat = get(chatId);
+      const msgs = yield messages(chatId);
+      return { chat, messages: msgs, exportedAt: (/* @__PURE__ */ new Date()).toISOString(), app: "Ai'sHub " + A.VERSION };
+    });
   }
-  async function exportAll() {
-    const chats = list();
-    const out = { app: "Ai'sHub", version: A.VERSION, exportedAt: (/* @__PURE__ */ new Date()).toISOString(), settings: A.settings.all, chats: [] };
-    for (const c of chats) out.chats.push(__spreadProps(__spreadValues({}, c), { messages: await messages(c.id) }));
-    return out;
+  function exportAll() {
+    return __async(this, null, function* () {
+      const chats = list();
+      const out = { app: "Ai'sHub", version: A.VERSION, exportedAt: (/* @__PURE__ */ new Date()).toISOString(), settings: A.settings.all, chats: [] };
+      for (const c of chats) out.chats.push(__spreadProps(__spreadValues({}, c), { messages: yield messages(c.id) }));
+      return out;
+    });
   }
   function toMarkdown(chat, msgs) {
     const lines = [`# ${chat.title}`, "", `*${new Date(chat.created).toLocaleString()} · ${msgs.length} messages · Ai'sHub*`, ""];
@@ -6134,6 +6464,26 @@ var __spreadValues = (a, b) => {
   return a;
 };
 var __spreadProps = (a, b) => __defProps(a, __getOwnPropDescs(b));
+var __async = (__this, __arguments, generator) => {
+  return new Promise((resolve, reject) => {
+    var fulfilled = (value) => {
+      try {
+        step(generator.next(value));
+      } catch (e) {
+        reject(e);
+      }
+    };
+    var rejected = (value) => {
+      try {
+        step(generator.throw(value));
+      } catch (e) {
+        reject(e);
+      }
+    };
+    var step = (x) => x.done ? resolve(x.value) : Promise.resolve(x.value).then(fulfilled, rejected);
+    step((generator = generator.apply(__this, __arguments)).next());
+  });
+};
 (function() {
   "use strict";
   const A = window.A;
@@ -6216,201 +6566,227 @@ Rules:
     }
     return { plan, steps: steps.slice(0, MAX_STEPS), source: "offline" };
   }
-  async function cloudPlan(goal, { signal } = {}) {
-    const model = A.ai.resolveSelected();
-    if (A.ai.isLocal(model)) return null;
-    const skillList = Object.values(A.skills.all).map((s) => `${s.id}(${Object.keys(s.params).join(", ")})${s.network ? " [net]" : ""}`).join(" ");
-    const system = PLANNER_SYSTEM.replace("{{SKILLS}}", skillList);
-    try {
-      const res = await A.ai.chat({
-        messages: [{ role: "user", content: `Goal: ${goal}` }],
-        model,
-        system,
-        onDelta: null,
-        signal,
-        noFallback: true,
-        maxTokens: 700,
-        temperature: 0.2
-      });
-      const parsed = A.util.sanitizeJsonParse(A.util.stripFences(res.text), null);
-      if (!parsed) return null;
-      const steps = (parsed.steps || []).filter((s) => s && A.skills.all[s.skill]).slice(0, MAX_STEPS).map((s) => ({ skill: s.skill, input: s.input || {}, why: s.why || "", mutates: !!A.skills.all[s.skill].mutates }));
-      const plan = Array.isArray(parsed.plan) ? parsed.plan.map(String).slice(0, MAX_STEPS) : steps.map((s) => s.why || s.skill);
-      return { plan, steps, source: "cloud", model: res.model };
-    } catch (err) {
-      if (signal == null ? void 0 : signal.aborted) throw err;
-      return null;
-    }
-  }
-  async function run(goal, { onStep = () => {
-  }, approve, signal, onPlan = () => {
-  } } = {}) {
-    const task = {
-      id: uid("task_"),
-      goal,
-      created: Date.now(),
-      finished: null,
-      state: "running",
-      steps: [],
-      plan: [],
-      result: "",
-      source: ""
-    };
-    A.bus.emit("task:start", task);
-    let planData = null;
-    try {
-      planData = await cloudPlan(goal, { signal });
-    } catch (err) {
-      if (signal == null ? void 0 : signal.aborted) throw err;
-    }
-    if (!planData) planData = offlinePlan(goal);
-    task.plan = planData.plan;
-    task.source = planData.source;
-    onPlan(planData);
-    const results = [];
-    for (let i = 0; i < planData.steps.length; i++) {
-      if (signal == null ? void 0 : signal.aborted) {
-        task.state = "cancelled";
-        break;
+  function cloudPlan(_0) {
+    return __async(this, arguments, function* (goal, { signal } = {}) {
+      const model = A.ai.resolveSelected();
+      if (A.ai.isLocal(model)) return null;
+      const skillList = Object.values(A.skills.all).map((s) => `${s.id}(${Object.keys(s.params).join(", ")})${s.network ? " [net]" : ""}`).join(" ");
+      const system = PLANNER_SYSTEM.replace("{{SKILLS}}", skillList);
+      try {
+        const res = yield A.ai.chat({
+          messages: [{ role: "user", content: `Goal: ${goal}` }],
+          model,
+          system,
+          onDelta: null,
+          signal,
+          noFallback: true,
+          maxTokens: 700,
+          temperature: 0.2
+        });
+        const parsed = A.util.sanitizeJsonParse(A.util.stripFences(res.text), null);
+        if (!parsed) return null;
+        const steps = (parsed.steps || []).filter((s) => s && A.skills.all[s.skill]).slice(0, MAX_STEPS).map((s) => ({ skill: s.skill, input: s.input || {}, why: s.why || "", mutates: !!A.skills.all[s.skill].mutates }));
+        const plan = Array.isArray(parsed.plan) ? parsed.plan.map(String).slice(0, MAX_STEPS) : steps.map((s) => s.why || s.skill);
+        return { plan, steps, source: "cloud", model: res.model };
+      } catch (err) {
+        if (signal == null ? void 0 : signal.aborted) throw err;
+        return null;
       }
-      const step = planData.steps[i];
-      if (step.deferred) continue;
-      const record = { n: i + 1, skill: step.skill, input: step.input, why: step.why, state: "running", started: Date.now() };
-      task.steps.push(record);
-      onStep(record, "start");
-      const skill = A.skills.all[step.skill];
-      if (step.mutates && A.settings.get("agentApproval") === "confirm" && approve) {
-        const ok = await approve(record);
-        if (!ok) {
-          record.state = "skipped";
-          record.output = "Skipped by user";
-          onStep(record, "skip");
+    });
+  }
+  function run(_0) {
+    return __async(this, arguments, function* (goal, { onStep = () => {
+    }, approve, signal, onPlan = () => {
+    } } = {}) {
+      const task = {
+        id: uid("task_"),
+        goal,
+        created: Date.now(),
+        finished: null,
+        state: "running",
+        steps: [],
+        plan: [],
+        result: "",
+        source: ""
+      };
+      A.bus.emit("task:start", task);
+      let planData = null;
+      try {
+        planData = yield cloudPlan(goal, { signal });
+      } catch (err) {
+        if (signal == null ? void 0 : signal.aborted) throw err;
+      }
+      if (!planData) planData = offlinePlan(goal);
+      task.plan = planData.plan;
+      task.source = planData.source;
+      onPlan(planData);
+      const results = [];
+      for (let i = 0; i < planData.steps.length; i++) {
+        if (signal == null ? void 0 : signal.aborted) {
+          task.state = "cancelled";
+          break;
+        }
+        const step = planData.steps[i];
+        if (step.deferred) continue;
+        const record = { n: i + 1, skill: step.skill, input: step.input, why: step.why, state: "running", started: Date.now() };
+        task.steps.push(record);
+        onStep(record, "start");
+        const skill = A.skills.all[step.skill];
+        if (step.mutates && A.settings.get("agentApproval") === "confirm" && approve) {
+          const ok = yield approve(record);
+          if (!ok) {
+            record.state = "skipped";
+            record.output = "Skipped by user";
+            onStep(record, "skip");
+            continue;
+          }
+        }
+        if (skill.network && !A.net.online) {
+          record.state = "error";
+          record.output = "Needs internet — skipped offline";
+          onStep(record, "err");
           continue;
         }
+        try {
+          const output = yield A.skills.run(step.skill, step.input, { signal });
+          record.state = "ok";
+          record.output = output;
+          record.finished = Date.now();
+          results.push({ skill: step.skill, output });
+          onStep(record, "ok");
+        } catch (err) {
+          record.state = "error";
+          record.output = err.message;
+          record.finished = Date.now();
+          onStep(record, "err");
+        }
       }
-      if (skill.network && !A.net.online) {
-        record.state = "error";
-        record.output = "Needs internet — skipped offline";
-        onStep(record, "err");
-        continue;
+      task.finished = Date.now();
+      if (task.state !== "cancelled") {
+        task.state = task.steps.some((s) => s.state === "ok") || !task.steps.length ? "done" : "failed";
       }
-      try {
-        const output = await A.skills.run(step.skill, step.input, { signal });
-        record.state = "ok";
-        record.output = output;
-        record.finished = Date.now();
-        results.push({ skill: step.skill, output });
-        onStep(record, "ok");
-      } catch (err) {
-        record.state = "error";
-        record.output = err.message;
-        record.finished = Date.now();
-        onStep(record, "err");
+      task.result = yield composeReport(goal, task, results, { signal });
+      for (const step of planData.steps.filter((s) => s.deferred)) {
+        if (signal == null ? void 0 : signal.aborted) break;
+        const record = task.steps.find((r) => r.skill === step.skill && r.state === "skipped_pending");
+        if (record) continue;
+        const input = __spreadProps(__spreadValues({}, step.input), { body: step.input.body || task.result });
+        try {
+          const output = yield A.skills.run(step.skill, input, { signal });
+          task.steps.push({ n: task.steps.length + 1, skill: step.skill, input, why: step.why, state: "ok", output, started: Date.now(), finished: Date.now() });
+          results.push({ skill: step.skill, output });
+          onStep(task.steps[task.steps.length - 1], "ok");
+        } catch (err) {
+          task.steps.push({ n: task.steps.length + 1, skill: step.skill, input, why: step.why, state: "error", output: err.message });
+          onStep(task.steps[task.steps.length - 1], "err");
+        }
       }
-    }
-    task.finished = Date.now();
-    if (task.state !== "cancelled") {
-      task.state = task.steps.some((s) => s.state === "ok") || !task.steps.length ? "done" : "failed";
-    }
-    task.result = await composeReport(goal, task, results, { signal });
-    for (const step of planData.steps.filter((s) => s.deferred)) {
-      if (signal == null ? void 0 : signal.aborted) break;
-      const record = task.steps.find((r) => r.skill === step.skill && r.state === "skipped_pending");
-      if (record) continue;
-      const input = __spreadProps(__spreadValues({}, step.input), { body: step.input.body || task.result });
-      try {
-        const output = await A.skills.run(step.skill, input, { signal });
-        task.steps.push({ n: task.steps.length + 1, skill: step.skill, input, why: step.why, state: "ok", output, started: Date.now(), finished: Date.now() });
-        results.push({ skill: step.skill, output });
-        onStep(task.steps[task.steps.length - 1], "ok");
-      } catch (err) {
-        task.steps.push({ n: task.steps.length + 1, skill: step.skill, input, why: step.why, state: "error", output: err.message });
-        onStep(task.steps[task.steps.length - 1], "err");
-      }
-    }
-    await A.store.DB.putTask(task);
-    A.bus.emit("task:done", task);
-    return task;
+      yield A.store.DB.putTask(task);
+      A.bus.emit("task:done", task);
+      return task;
+    });
   }
-  async function composeReport(goal, task, results, { signal } = {}) {
-    var _a;
-    const facts = results.map((r) => `- ${r.skill}: ${JSON.stringify(r.output).slice(0, 600)}`).join("\n");
-    if (!results.length) {
-      return `I looked at "${A.util.truncate(goal, 80)}" but no skill could act on it offline. Try Chat mode for an answer, or connect a cloud model so the agent can reason across steps.`;
-    }
-    const model = A.ai.resolveSelected();
-    if (!A.ai.isLocal(model) && A.net.online) {
-      try {
-        const res = await A.ai.chat({
-          messages: [
-            {
-              role: "user",
-              content: `Goal: ${goal}
+  function composeReport(_0, _1, _2) {
+    return __async(this, arguments, function* (goal, task, results, { signal } = {}) {
+      var _a;
+      const facts = results.map((r) => `- ${r.skill}: ${JSON.stringify(r.output).slice(0, 600)}`).join("\n");
+      if (!results.length) {
+        return `I looked at "${A.util.truncate(goal, 80)}" but no skill could act on it offline. Try Chat mode for an answer, or connect a cloud model so the agent can reason across steps.`;
+      }
+      const model = A.ai.resolveSelected();
+      if (!A.ai.isLocal(model) && A.net.online) {
+        try {
+          const res = yield A.ai.chat({
+            messages: [
+              {
+                role: "user",
+                content: `Goal: ${goal}
 
 Step results:
 ${facts}
 
 Write a short final report for the user (max 180 words, Markdown, no preamble). Include the concrete results and any next action.`
-            }
-          ],
-          model,
-          onDelta: null,
-          signal,
-          noFallback: true,
-          maxTokens: 500,
-          temperature: 0.4
-        });
-        if (res.text && res.text.trim()) return res.text.trim();
-      } catch (_) {
+              }
+            ],
+            model,
+            onDelta: null,
+            signal,
+            noFallback: true,
+            maxTokens: 500,
+            temperature: 0.4
+          });
+          if (res.text && res.text.trim()) return res.text.trim();
+        } catch (_) {
+        }
       }
-    }
-    const lines = [`## Done: ${A.util.truncate(goal, 70)}`, ""];
-    for (const r of results) {
-      const o = r.output || {};
-      switch (r.skill) {
-        case "calculator":
-          lines.push(`**Result:** ${(_a = o.formatted) != null ? _a : o.value}`);
-          break;
-        case "convert":
-          lines.push(`**Conversion:** ${o.label || `${o.result} ${o.unit}`}`);
-          break;
-        case "checklist":
-          lines.push(`**Plan (${o.days} days)**`);
-          (o.checklist || []).forEach((c) => lines.push(`${c.n}. ${c.task} — _${c.due}_`));
-          break;
-        case "list_notes":
-          lines.push(`**Notes found:** ${o.count}`);
-          (o.notes || []).forEach((n) => lines.push(`- **${n.title}** — ${n.preview}`));
-          break;
-        case "save_note":
-          lines.push(`**Saved note:** ${o.title}`);
-          break;
-        case "knowledge":
-          if (o.found) (o.topics || []).forEach((t) => lines.push(`**${t.title}**
+      const lines = [`## Done: ${A.util.truncate(goal, 70)}`, ""];
+      for (const r of results) {
+        const o = r.output || {};
+        switch (r.skill) {
+          case "calculator":
+            lines.push(`**Result:** ${(_a = o.formatted) != null ? _a : o.value}`);
+            break;
+          case "convert":
+            lines.push(`**Conversion:** ${o.label || `${o.result} ${o.unit}`}`);
+            break;
+          case "checklist":
+            lines.push(`**Plan (${o.days} days)**`);
+            (o.checklist || []).forEach((c) => lines.push(`${c.n}. ${c.task} — _${c.due}_`));
+            break;
+          case "list_notes":
+            lines.push(`**Notes found:** ${o.count}`);
+            (o.notes || []).forEach((n) => lines.push(`- **${n.title}** — ${n.preview}`));
+            break;
+          case "save_note":
+            lines.push(`**Saved note:** ${o.title}`);
+            break;
+          case "knowledge":
+            if (o.found) (o.topics || []).forEach((t) => lines.push(`**${t.title}**
 ${t.excerpt}`));
-          else lines.push("No matching offline topic — ask me in Chat mode for a full answer.");
-          break;
-        case "text_stats":
-          lines.push(`**Text:** ${o.words} words · ${o.characters} chars · ~${o.readingMinutes} min read`);
-          break;
-        case "remember":
-          lines.push(`**Remembered:** ${o.fact}`);
-          break;
-        case "date_math":
-          lines.push(`**Date:** ${o.pretty || o.date}`);
-          break;
-        default:
-          lines.push(`**${r.skill}:** \`${JSON.stringify(o).slice(0, 200)}\``);
+            else lines.push("No matching offline topic — ask me in Chat mode for a full answer.");
+            break;
+          case "text_stats":
+            lines.push(`**Text:** ${o.words} words · ${o.characters} chars · ~${o.readingMinutes} min read`);
+            break;
+          case "remember":
+            lines.push(`**Remembered:** ${o.fact}`);
+            break;
+          case "date_math":
+            lines.push(`**Date:** ${o.pretty || o.date}`);
+            break;
+          default:
+            lines.push(`**${r.skill}:** \`${JSON.stringify(o).slice(0, 200)}\``);
+        }
       }
-    }
-    lines.push("", `_Ran ${results.length} step${results.length > 1 ? "s" : ""} ${task.source === "offline" ? "on-device" : "with " + task.source}._`);
-    return lines.join("\n");
+      lines.push("", `_Ran ${results.length} step${results.length > 1 ? "s" : ""} ${task.source === "offline" ? "on-device" : "with " + task.source}._`);
+      return lines.join("\n");
+    });
   }
   A.agent = { run, offlinePlan, cloudPlan, MAX_STEPS };
 })();
 
 </script>
 <script>
+var __async = (__this, __arguments, generator) => {
+  return new Promise((resolve, reject) => {
+    var fulfilled = (value) => {
+      try {
+        step(generator.next(value));
+      } catch (e) {
+        reject(e);
+      }
+    };
+    var rejected = (value) => {
+      try {
+        step(generator.throw(value));
+      } catch (e) {
+        reject(e);
+      }
+    };
+    var step = (x) => x.done ? resolve(x.value) : Promise.resolve(x.value).then(fulfilled, rejected);
+    step((generator = generator.apply(__this, __arguments)).next());
+  });
+};
 (function() {
   "use strict";
   const A = window.A;
@@ -6539,13 +6915,13 @@ ${t.excerpt}`));
       m.__finish = dismissible ? () => finish(null) : null;
       actions.forEach((a) => {
         const btn = el("button", { class: `btn ${a.class || "btn-ghost"}` }, A.util.escapeHtml(a.label));
-        btn.addEventListener("click", async () => {
+        btn.addEventListener("click", () => __async(null, null, function* () {
           if (a.onClick) {
-            const res = await a.onClick();
+            const res = yield a.onClick();
             if (res === false) return;
           }
           finish(a.value !== void 0 ? a.value : a.label);
-        });
+        }));
         actionsEl.appendChild(btn);
       });
       m.hidden = false;
@@ -6678,6 +7054,26 @@ var __spreadValues = (a, b) => {
   return a;
 };
 var __spreadProps = (a, b) => __defProps(a, __getOwnPropDescs(b));
+var __async = (__this, __arguments, generator) => {
+  return new Promise((resolve, reject) => {
+    var fulfilled = (value) => {
+      try {
+        step(generator.next(value));
+      } catch (e) {
+        reject(e);
+      }
+    };
+    var rejected = (value) => {
+      try {
+        step(generator.throw(value));
+      } catch (e) {
+        reject(e);
+      }
+    };
+    var step = (x) => x.done ? resolve(x.value) : Promise.resolve(x.value).then(fulfilled, rejected);
+    step((generator = generator.apply(__this, __arguments)).next());
+  });
+};
 (function() {
   "use strict";
   const A = window.A;
@@ -6721,27 +7117,31 @@ var __spreadProps = (a, b) => __defProps(a, __getOwnPropDescs(b));
     }
     target.scrollTop = target.scrollHeight;
   }
-  async function openChat(chatId) {
-    stop();
-    const chat = chatId ? A.chatStore.get(chatId) : null;
-    state.chatId = chat ? chat.id : null;
-    state.messages = chat ? await A.chatStore.messages(chat.id) : [];
-    state.mode = (chat == null ? void 0 : chat.mode) || A.settings.get("mode") || "chat";
-    A.settings.set("lastChatId", state.chatId, { silent: true });
-    syncModeUI();
-    renderAll();
-    A.bus.emit("chat:opened", state.chatId);
+  function openChat(chatId) {
+    return __async(this, null, function* () {
+      stop();
+      const chat = chatId ? A.chatStore.get(chatId) : null;
+      state.chatId = chat ? chat.id : null;
+      state.messages = chat ? yield A.chatStore.messages(chat.id) : [];
+      state.mode = (chat == null ? void 0 : chat.mode) || A.settings.get("mode") || "chat";
+      A.settings.set("lastChatId", state.chatId, { silent: true });
+      syncModeUI();
+      renderAll();
+      A.bus.emit("chat:opened", state.chatId);
+    });
   }
-  async function newChat({ silent = false } = {}) {
-    stop();
-    state.chatId = null;
-    state.messages = [];
-    state.draftAttachments = [];
-    A.settings.set("lastChatId", null, { silent: true });
-    renderAll();
-    updateComposerHint();
-    if (!silent) dom.input.focus();
-    A.bus.emit("chat:opened", null);
+  function newChat() {
+    return __async(this, arguments, function* ({ silent = false } = {}) {
+      stop();
+      state.chatId = null;
+      state.messages = [];
+      state.draftAttachments = [];
+      A.settings.set("lastChatId", null, { silent: true });
+      renderAll();
+      updateComposerHint();
+      if (!silent) dom.input.focus();
+      A.bus.emit("chat:opened", null);
+    });
   }
   function ensureChat() {
     if (state.chatId) return state.chatId;
@@ -6908,10 +7308,10 @@ var __spreadProps = (a, b) => __defProps(a, __getOwnPropDescs(b));
       b.addEventListener("click", handler);
       return b;
     };
-    actions.appendChild(mk("copy", "Copy", async () => {
-      const ok = await A.util.copyText(m.content || "");
+    actions.appendChild(mk("copy", "Copy", () => __async(null, null, function* () {
+      const ok = yield A.util.copyText(m.content || "");
       toast(ok ? "Copied" : "Copy failed", ok ? "ok" : "err", 1400);
-    }));
+    })));
     actions.appendChild(mk("refresh", "Retry", () => regenerate(m.id)));
     actions.appendChild(mk("pencil", "Edit", () => editLast(m.id)));
     actions.appendChild(mk("trash", "", () => deleteFrom(m.id)));
@@ -6964,277 +7364,287 @@ var __spreadProps = (a, b) => __defProps(a, __getOwnPropDescs(b));
     }
     setBusy(false);
   }
-  async function send(rawText) {
-    var _a, _b, _c, _d, _e, _f, _g;
-    const text = (rawText !== void 0 ? rawText : dom.input.value).trim();
-    if (!text || state.busy) return;
-    const mode = state.mode;
-    (_b = (_a = A.app).haptic) == null ? void 0 : _b.call(_a, 9);
-    dom.input.value = "";
-    autosize();
-    ensureChat();
-    const userMsg = { role: "user", content: text, ts: Date.now(), attachments: state.draftAttachments };
-    state.draftAttachments = [];
-    state.messages.push(userMsg);
-    dom.welcome.hidden = true;
-    dom.messages.appendChild(messageNode(userMsg));
-    scrollToBottom();
-    updateComposerHint();
-    await A.chatStore.append(state.chatId, userMsg).catch((err) => {
-      console.warn("[chat] could not persist message", err);
-    });
-    if (mode === "agent") return runAgentTurn(text);
-    setBusy(true);
-    state.abort = new AbortController();
-    const model = A.ai.resolveSelected();
-    const started = Date.now();
-    const placeholder = { id: A.util.uid("m_"), role: "assistant", content: "", ts: Date.now(), model: model ? A.catalog.keyFor(model) : "local", modelName: model == null ? void 0 : model.name, streaming: true };
-    const node = messageNode(placeholder);
-    const prose = node.querySelector(".prose");
-    prose.innerHTML = `<div class="thinking"><span class="dots"><i></i><i></i><i></i></span><span>${A.ai.isLocal(model) ? "Thinking on-device…" : "Thinking with " + esc((model == null ? void 0 : model.name) || "model") + "…"}</span></div>`;
-    dom.messages.appendChild(node);
-    scrollToBottom();
-    let full = "";
-    const deltas = [];
-    let renderQueued = false;
-    const paint = () => {
-      renderQueued = false;
-      prose.innerHTML = A.markdown.render(full) + '<span class="stream-caret"></span>';
-      if (nearBottom()) scrollToBottom(false);
-    };
-    try {
-      const supportsVision = Boolean(model && model.vision);
-      const history = state.messages.filter((m) => !m.error).map((m) => {
-        const images = (m.attachments || []).filter((a) => a.kind === "image");
-        if (m.role === "user" && supportsVision && images.length) {
-          return {
+  function send(rawText) {
+    return __async(this, null, function* () {
+      var _a, _b, _c, _d, _e, _f, _g;
+      const text = (rawText !== void 0 ? rawText : dom.input.value).trim();
+      if (!text || state.busy) return;
+      const mode = state.mode;
+      (_b = (_a = A.app).haptic) == null ? void 0 : _b.call(_a, 9);
+      dom.input.value = "";
+      autosize();
+      ensureChat();
+      const userMsg = { role: "user", content: text, ts: Date.now(), attachments: state.draftAttachments };
+      state.draftAttachments = [];
+      state.messages.push(userMsg);
+      dom.welcome.hidden = true;
+      dom.messages.appendChild(messageNode(userMsg));
+      scrollToBottom();
+      updateComposerHint();
+      yield A.chatStore.append(state.chatId, userMsg).catch((err) => {
+        console.warn("[chat] could not persist message", err);
+      });
+      if (mode === "agent") return runAgentTurn(text);
+      setBusy(true);
+      state.abort = new AbortController();
+      const model = A.ai.resolveSelected();
+      const started = Date.now();
+      const placeholder = { id: A.util.uid("m_"), role: "assistant", content: "", ts: Date.now(), model: model ? A.catalog.keyFor(model) : "local", modelName: model == null ? void 0 : model.name, streaming: true };
+      const node = messageNode(placeholder);
+      const prose = node.querySelector(".prose");
+      prose.innerHTML = `<div class="thinking"><span class="dots"><i></i><i></i><i></i></span><span>${A.ai.isLocal(model) ? "Thinking on-device…" : "Thinking with " + esc((model == null ? void 0 : model.name) || "model") + "…"}</span></div>`;
+      dom.messages.appendChild(node);
+      scrollToBottom();
+      let full = "";
+      const deltas = [];
+      let renderQueued = false;
+      const paint = () => {
+        renderQueued = false;
+        prose.innerHTML = A.markdown.render(full) + '<span class="stream-caret"></span>';
+        if (nearBottom()) scrollToBottom(false);
+      };
+      try {
+        const supportsVision = Boolean(model && model.vision);
+        const history = state.messages.filter((m) => !m.error).map((m) => {
+          const images = (m.attachments || []).filter((a) => a.kind === "image");
+          if (m.role === "user" && supportsVision && images.length) {
+            return {
+              role: "user",
+              content: [
+                { type: "text", text: m.content || "What is in this image?" },
+                ...images.map((a) => ({ type: "image_url", image_url: { url: a.data } }))
+              ]
+            };
+          }
+          return { role: m.role, content: m.content };
+        }).slice(-24);
+        const droppedImages = !supportsVision && ((_d = (_c = state.messages.slice(-1)[0]) == null ? void 0 : _c.attachments) == null ? void 0 : _d.some((a) => a.kind === "image"));
+        if (droppedImages) {
+          toast(`${(model == null ? void 0 : model.name) || "This model"} cannot see images — answer uses text only`, "", 3200);
+          history[history.length - 1] = {
             role: "user",
-            content: [
-              { type: "text", text: m.content || "What is in this image?" },
-              ...images.map((a) => ({ type: "image_url", image_url: { url: a.data } }))
-            ]
+            content: (state.messages.slice(-1)[0].content || "") + "\n\n(An image was attached but this model cannot view images.)"
           };
         }
-        return { role: m.role, content: m.content };
-      }).slice(-24);
-      const droppedImages = !supportsVision && ((_d = (_c = state.messages.slice(-1)[0]) == null ? void 0 : _c.attachments) == null ? void 0 : _d.some((a) => a.kind === "image"));
-      if (droppedImages) {
-        toast(`${(model == null ? void 0 : model.name) || "This model"} cannot see images — answer uses text only`, "", 3200);
-        history[history.length - 1] = {
-          role: "user",
-          content: (state.messages.slice(-1)[0].content || "") + "\n\n(An image was attached but this model cannot view images.)"
-        };
-      }
-      if (A.phoneActions && A.phoneActions.looksLikePhoneRequest(text)) {
-        const handled = await A.phoneActions.tryHandle(text);
-        if (handled) {
-          full = handled.text;
-          const saved2 = __spreadProps(__spreadValues({}, placeholder), {
-            content: full,
-            model: "phone",
-            modelName: "Phone control",
-            streaming: false,
-            ms: Date.now() - started
-          });
-          state.messages.push(saved2);
-          await A.chatStore.append(state.chatId, saved2).catch(() => {
-          });
-          const fresh2 = messageNode(saved2);
-          node.replaceWith(fresh2);
-          A.markdown.bindCopy(fresh2);
-          if (nearBottom()) scrollToBottom();
-          setBusy(false);
-          return;
-        }
-      }
-      const res = await A.ai.chat({
-        messages: history,
-        model,
-        signal: state.abort.signal,
-        onDelta: (delta, whole) => {
-          full = whole;
-          if (!renderQueued) {
-            renderQueued = true;
-            requestAnimationFrame(paint);
+        if (A.phoneActions && A.phoneActions.looksLikePhoneRequest(text)) {
+          const handled = yield A.phoneActions.tryHandle(text);
+          if (handled) {
+            full = handled.text;
+            const saved2 = __spreadProps(__spreadValues({}, placeholder), {
+              content: full,
+              model: "phone",
+              modelName: "Phone control",
+              streaming: false,
+              ms: Date.now() - started
+            });
+            state.messages.push(saved2);
+            yield A.chatStore.append(state.chatId, saved2).catch(() => {
+            });
+            const fresh2 = messageNode(saved2);
+            node.replaceWith(fresh2);
+            A.markdown.bindCopy(fresh2);
+            if (nearBottom()) scrollToBottom();
+            setBusy(false);
+            return;
           }
-        },
-        onFallback: ({ to, reason }) => {
-          toast(`${(model == null ? void 0 : model.name) || "Model"} unavailable → switched to ${to.name}`, "", 3e3);
-          deltas.push(reason);
         }
-      });
-      full = (res.text || full || "").trim();
-      const saved = __spreadProps(__spreadValues({}, placeholder), {
-        content: full,
-        model: res.provider === "local" ? res.model : A.catalog.keyFor({ provider: res.provider, id: res.model }),
-        modelName: ((_e = A.catalog.find(A.catalog.keyFor({ provider: res.provider, id: res.model }))) == null ? void 0 : _e.name) || res.model,
-        usage: res.usage,
-        ms: Date.now() - started,
-        usedFallback: res.usedFallback,
-        fallbackFrom: res.fallbackFrom ? A.catalog.keyFor(res.fallbackFrom) : null,
-        streaming: false
-      });
-      state.messages.push(saved);
-      await A.chatStore.append(state.chatId, saved);
-      const fresh = messageNode(saved);
-      node.replaceWith(fresh);
-      A.markdown.bindCopy(fresh);
-      if (nearBottom()) scrollToBottom();
-    } catch (err) {
-      const aborted = err.name === "AbortError" || ((_f = state.abort) == null ? void 0 : _f.signal.aborted);
-      if (aborted) {
-        if (full.trim()) {
-          const saved = __spreadProps(__spreadValues({}, placeholder), { content: full.trim() + "\n\n_(stopped)_", streaming: false, ms: Date.now() - started });
-          state.messages.push(saved);
-          await A.chatStore.append(state.chatId, saved);
-          node.replaceWith(messageNode(saved));
-        } else {
-          node.remove();
-        }
-      } else {
-        const message = A.net.friendlyMessage(err, A.catalog.providerName(model == null ? void 0 : model.provider));
-        const errorMsg = __spreadProps(__spreadValues({}, placeholder), {
-          content: "",
-          error: message,
-          errorAction: !A.ai.isLocal(model) && !A.settings.hasKey(model.provider) ? "models" : A.net.online ? "" : "",
-          errorActionLabel: "Open Models",
+        const res = yield A.ai.chat({
+          messages: history,
+          model,
+          signal: state.abort.signal,
+          onDelta: (delta, whole) => {
+            full = whole;
+            if (!renderQueued) {
+              renderQueued = true;
+              requestAnimationFrame(paint);
+            }
+          },
+          onFallback: ({ to, reason }) => {
+            toast(`${(model == null ? void 0 : model.name) || "Model"} unavailable → switched to ${to.name}`, "", 3e3);
+            deltas.push(reason);
+          }
+        });
+        full = (res.text || full || "").trim();
+        const saved = __spreadProps(__spreadValues({}, placeholder), {
+          content: full,
+          model: res.provider === "local" ? res.model : A.catalog.keyFor({ provider: res.provider, id: res.model }),
+          modelName: ((_e = A.catalog.find(A.catalog.keyFor({ provider: res.provider, id: res.model }))) == null ? void 0 : _e.name) || res.model,
+          usage: res.usage,
+          ms: Date.now() - started,
+          usedFallback: res.usedFallback,
+          fallbackFrom: res.fallbackFrom ? A.catalog.keyFor(res.fallbackFrom) : null,
           streaming: false
         });
-        state.messages.push(errorMsg);
-        await A.chatStore.append(state.chatId, errorMsg);
-        const fresh = messageNode(errorMsg);
+        state.messages.push(saved);
+        yield A.chatStore.append(state.chatId, saved);
+        const fresh = messageNode(saved);
         node.replaceWith(fresh);
-        (_g = fresh.querySelector(".fix-link")) == null ? void 0 : _g.addEventListener("click", (e) => {
-          e.preventDefault();
-          A.app.go("models");
-        });
-      }
-    } finally {
-      setBusy(false);
-      state.abort = null;
-      autosize();
-      updateComposerHint();
-    }
-  }
-  async function runAgentTurn(goal) {
-    var _a;
-    setBusy(true);
-    state.abort = new AbortController();
-    const started = Date.now();
-    const model = A.ai.resolveSelected();
-    const placeholder = {
-      id: A.util.uid("m_"),
-      role: "assistant",
-      content: "",
-      ts: Date.now(),
-      model: A.catalog.keyFor(model),
-      modelName: model == null ? void 0 : model.name,
-      trace: { steps: [], plan: [] },
-      streaming: true
-    };
-    const node = messageNode(placeholder);
-    const bodyWrap = node.querySelector(".ai-body");
-    const prose = node.querySelector(".prose");
-    const trace = traceNode(placeholder.trace);
-    bodyWrap.insertBefore(trace.node, prose);
-    prose.innerHTML = `<div class="thinking"><span class="dots"><i></i><i></i><i></i></span><span>Planning…</span></div>`;
-    dom.messages.appendChild(node);
-    scrollToBottom();
-    let approved = true;
-    try {
-      const task = await A.agent.run(goal, {
-        signal: state.abort.signal,
-        onPlan: (p) => {
-          placeholder.trace.plan = p.plan;
-          prose.innerHTML = `<div class="thinking"><span class="dots"><i></i><i></i><i></i></span><span>${p.source === "cloud" ? "Planned with " + esc((model == null ? void 0 : model.name) || "model") : "Planned on-device"} · ${p.steps.length} steps</span></div>`;
-        },
-        onStep: (step, kind) => {
-          const idx = placeholder.trace.steps.findIndex((s) => s.skill === step.skill && s.n === step.n);
-          const record = __spreadProps(__spreadValues({}, step), { state: kind === "start" ? "running" : kind === "ok" ? "ok" : kind === "err" ? "error" : "skipped" });
-          if (idx >= 0) placeholder.trace.steps[idx] = record;
-          else placeholder.trace.steps.push(record);
-          trace.refresh();
-          if (kind === "start") prose.innerHTML = `<div class="thinking"><span class="dots"><i></i><i></i><i></i></span><span>Running ${esc(step.skill)}…</span></div>`;
-          if (nearBottom()) scrollToBottom(false);
-        },
-        approve: async (step) => {
-          setBusy(false);
-          const ok = await A.ui.approveStep(step);
-          setBusy(true);
-          approved = approved && ok;
-          return ok;
+        A.markdown.bindCopy(fresh);
+        if (nearBottom()) scrollToBottom();
+      } catch (err) {
+        const aborted = err.name === "AbortError" || ((_f = state.abort) == null ? void 0 : _f.signal.aborted);
+        if (aborted) {
+          if (full.trim()) {
+            const saved = __spreadProps(__spreadValues({}, placeholder), { content: full.trim() + "\n\n_(stopped)_", streaming: false, ms: Date.now() - started });
+            state.messages.push(saved);
+            yield A.chatStore.append(state.chatId, saved);
+            node.replaceWith(messageNode(saved));
+          } else {
+            node.remove();
+          }
+        } else {
+          const message = A.net.friendlyMessage(err, A.catalog.providerName(model == null ? void 0 : model.provider));
+          const errorMsg = __spreadProps(__spreadValues({}, placeholder), {
+            content: "",
+            error: message,
+            errorAction: !A.ai.isLocal(model) && !A.settings.hasKey(model.provider) ? "models" : A.net.online ? "" : "",
+            errorActionLabel: "Open Models",
+            streaming: false
+          });
+          state.messages.push(errorMsg);
+          yield A.chatStore.append(state.chatId, errorMsg);
+          const fresh = messageNode(errorMsg);
+          node.replaceWith(fresh);
+          (_g = fresh.querySelector(".fix-link")) == null ? void 0 : _g.addEventListener("click", (e) => {
+            e.preventDefault();
+            A.app.go("models");
+          });
         }
-      });
-      placeholder.content = task.result;
-      placeholder.trace = { steps: task.steps, plan: task.plan, source: task.source };
-      placeholder.ms = Date.now() - started;
-      placeholder.streaming = false;
-      state.messages.push(placeholder);
-      await A.chatStore.append(state.chatId, placeholder);
-      const fresh = messageNode(placeholder);
-      node.replaceWith(fresh);
-      A.markdown.bindCopy(fresh);
-      A.bus.emit("tasks:changed");
-      if (nearBottom()) scrollToBottom();
-    } catch (err) {
-      if (err.name === "AbortError" || ((_a = state.abort) == null ? void 0 : _a.signal.aborted)) {
-        placeholder.content = "_(agent stopped)_";
-      } else {
-        placeholder.error = A.net.friendlyMessage(err);
-        placeholder.content = "";
+      } finally {
+        setBusy(false);
+        state.abort = null;
+        autosize();
+        updateComposerHint();
       }
-      placeholder.streaming = false;
-      state.messages.push(placeholder);
-      await A.chatStore.append(state.chatId, placeholder);
-      node.replaceWith(messageNode(placeholder));
-    } finally {
-      setBusy(false);
-      state.abort = null;
-      updateComposerHint();
-    }
+    });
   }
-  async function regenerate(messageId) {
-    if (state.busy) return;
-    const idx = state.messages.findIndex((m) => m.id === messageId);
-    if (idx < 0) return;
-    let userIdx = idx - 1;
-    while (userIdx >= 0 && state.messages[userIdx].role !== "user") userIdx--;
-    if (userIdx < 0) return;
-    const userText = state.messages[userIdx].content;
-    const dropped = state.messages.splice(userIdx + 1);
-    for (const d of dropped) {
-      await A.chatStore.deleteFrom(state.chatId, d.ts);
-      const node = dom.messages.querySelector(`.msg-ai[data-id="${d.id}"]`);
-      if (node) node.remove();
-    }
-    dom.input.value = "";
-    await send(userText);
+  function runAgentTurn(goal) {
+    return __async(this, null, function* () {
+      var _a;
+      setBusy(true);
+      state.abort = new AbortController();
+      const started = Date.now();
+      const model = A.ai.resolveSelected();
+      const placeholder = {
+        id: A.util.uid("m_"),
+        role: "assistant",
+        content: "",
+        ts: Date.now(),
+        model: A.catalog.keyFor(model),
+        modelName: model == null ? void 0 : model.name,
+        trace: { steps: [], plan: [] },
+        streaming: true
+      };
+      const node = messageNode(placeholder);
+      const bodyWrap = node.querySelector(".ai-body");
+      const prose = node.querySelector(".prose");
+      const trace = traceNode(placeholder.trace);
+      bodyWrap.insertBefore(trace.node, prose);
+      prose.innerHTML = `<div class="thinking"><span class="dots"><i></i><i></i><i></i></span><span>Planning…</span></div>`;
+      dom.messages.appendChild(node);
+      scrollToBottom();
+      let approved = true;
+      try {
+        const task = yield A.agent.run(goal, {
+          signal: state.abort.signal,
+          onPlan: (p) => {
+            placeholder.trace.plan = p.plan;
+            prose.innerHTML = `<div class="thinking"><span class="dots"><i></i><i></i><i></i></span><span>${p.source === "cloud" ? "Planned with " + esc((model == null ? void 0 : model.name) || "model") : "Planned on-device"} · ${p.steps.length} steps</span></div>`;
+          },
+          onStep: (step, kind) => {
+            const idx = placeholder.trace.steps.findIndex((s) => s.skill === step.skill && s.n === step.n);
+            const record = __spreadProps(__spreadValues({}, step), { state: kind === "start" ? "running" : kind === "ok" ? "ok" : kind === "err" ? "error" : "skipped" });
+            if (idx >= 0) placeholder.trace.steps[idx] = record;
+            else placeholder.trace.steps.push(record);
+            trace.refresh();
+            if (kind === "start") prose.innerHTML = `<div class="thinking"><span class="dots"><i></i><i></i><i></i></span><span>Running ${esc(step.skill)}…</span></div>`;
+            if (nearBottom()) scrollToBottom(false);
+          },
+          approve: (step) => __async(null, null, function* () {
+            setBusy(false);
+            const ok = yield A.ui.approveStep(step);
+            setBusy(true);
+            approved = approved && ok;
+            return ok;
+          })
+        });
+        placeholder.content = task.result;
+        placeholder.trace = { steps: task.steps, plan: task.plan, source: task.source };
+        placeholder.ms = Date.now() - started;
+        placeholder.streaming = false;
+        state.messages.push(placeholder);
+        yield A.chatStore.append(state.chatId, placeholder);
+        const fresh = messageNode(placeholder);
+        node.replaceWith(fresh);
+        A.markdown.bindCopy(fresh);
+        A.bus.emit("tasks:changed");
+        if (nearBottom()) scrollToBottom();
+      } catch (err) {
+        if (err.name === "AbortError" || ((_a = state.abort) == null ? void 0 : _a.signal.aborted)) {
+          placeholder.content = "_(agent stopped)_";
+        } else {
+          placeholder.error = A.net.friendlyMessage(err);
+          placeholder.content = "";
+        }
+        placeholder.streaming = false;
+        state.messages.push(placeholder);
+        yield A.chatStore.append(state.chatId, placeholder);
+        node.replaceWith(messageNode(placeholder));
+      } finally {
+        setBusy(false);
+        state.abort = null;
+        updateComposerHint();
+      }
+    });
   }
-  async function editLast(messageId) {
-    const idx = state.messages.findIndex((m) => m.id === messageId);
-    if (idx < 0) return;
-    let userIdx = idx;
-    while (userIdx >= 0 && state.messages[userIdx].role !== "user") userIdx--;
-    const target = state.messages[userIdx >= 0 ? userIdx : idx];
-    if (!target || target.role !== "user") return;
-    dom.input.value = target.content;
-    autosize();
-    dom.input.focus();
-    state.messages = state.messages.slice(0, userIdx);
-    if (state.chatId) A.chatStore.deleteFrom(state.chatId, target.ts);
-    renderAll();
-    toast("Editing — press send to resend", "", 1800);
+  function regenerate(messageId) {
+    return __async(this, null, function* () {
+      if (state.busy) return;
+      const idx = state.messages.findIndex((m) => m.id === messageId);
+      if (idx < 0) return;
+      let userIdx = idx - 1;
+      while (userIdx >= 0 && state.messages[userIdx].role !== "user") userIdx--;
+      if (userIdx < 0) return;
+      const userText = state.messages[userIdx].content;
+      const dropped = state.messages.splice(userIdx + 1);
+      for (const d of dropped) {
+        yield A.chatStore.deleteFrom(state.chatId, d.ts);
+        const node = dom.messages.querySelector(`.msg-ai[data-id="${d.id}"]`);
+        if (node) node.remove();
+      }
+      dom.input.value = "";
+      yield send(userText);
+    });
   }
-  async function deleteFrom(messageId) {
-    if (state.busy) return;
-    const target = state.messages.find((m) => m.id === messageId);
-    if (!target) return;
-    const ok = await A.ui.confirmDialog("Delete from here?", "This message and everything after it will be removed.", { okLabel: "Delete", danger: true });
-    if (!ok) return;
-    state.messages = state.messages.filter((m) => m.ts < target.ts);
-    if (state.chatId) await A.chatStore.deleteFrom(state.chatId, target.ts);
-    renderAll();
-    toast("Deleted", "", 1500);
+  function editLast(messageId) {
+    return __async(this, null, function* () {
+      const idx = state.messages.findIndex((m) => m.id === messageId);
+      if (idx < 0) return;
+      let userIdx = idx;
+      while (userIdx >= 0 && state.messages[userIdx].role !== "user") userIdx--;
+      const target = state.messages[userIdx >= 0 ? userIdx : idx];
+      if (!target || target.role !== "user") return;
+      dom.input.value = target.content;
+      autosize();
+      dom.input.focus();
+      state.messages = state.messages.slice(0, userIdx);
+      if (state.chatId) A.chatStore.deleteFrom(state.chatId, target.ts);
+      renderAll();
+      toast("Editing — press send to resend", "", 1800);
+    });
+  }
+  function deleteFrom(messageId) {
+    return __async(this, null, function* () {
+      if (state.busy) return;
+      const target = state.messages.find((m) => m.id === messageId);
+      if (!target) return;
+      const ok = yield A.ui.confirmDialog("Delete from here?", "This message and everything after it will be removed.", { okLabel: "Delete", danger: true });
+      if (!ok) return;
+      state.messages = state.messages.filter((m) => m.ts < target.ts);
+      if (state.chatId) yield A.chatStore.deleteFrom(state.chatId, target.ts);
+      renderAll();
+      toast("Deleted", "", 1500);
+    });
   }
   function exportChatMarkdown() {
     if (!state.chatId) return;
@@ -7256,33 +7666,35 @@ var __spreadProps = (a, b) => __defProps(a, __getOwnPropDescs(b));
     });
     dom.input.placeholder = state.mode === "agent" ? "Describe the goal — I will plan and run it…" : "Ask anything…";
   }
-  async function attachFile(file) {
-    if (!file) return;
-    if (file.size > 4 * 1024 * 1024) {
-      toast("File too large (max 4 MB)", "err");
-      return;
-    }
-    const isImage = file.type.startsWith("image/");
-    if (isImage) {
-      const data = await A.util.readFileAsDataUrl(file);
-      state.draftAttachments.push({ kind: "image", name: file.name, data });
-      toast("Image attached — ask about it", "ok");
-    } else {
-      let text = "";
-      try {
-        text = await A.util.readFileAsText(file);
-      } catch (_) {
-        toast("Could not read that file", "err");
+  function attachFile(file) {
+    return __async(this, null, function* () {
+      if (!file) return;
+      if (file.size > 4 * 1024 * 1024) {
+        toast("File too large (max 4 MB)", "err");
         return;
       }
-      if (text.length > 2e4) text = text.slice(0, 2e4) + "\n…(truncated)";
-      state.draftAttachments.push({ kind: "text", name: file.name, text });
-      dom.input.value = `${dom.input.value}${dom.input.value ? "\n\n" : ""}File "${file.name}":
+      const isImage = file.type.startsWith("image/");
+      if (isImage) {
+        const data = yield A.util.readFileAsDataUrl(file);
+        state.draftAttachments.push({ kind: "image", name: file.name, data });
+        toast("Image attached — ask about it", "ok");
+      } else {
+        let text = "";
+        try {
+          text = yield A.util.readFileAsText(file);
+        } catch (_) {
+          toast("Could not read that file", "err");
+          return;
+        }
+        if (text.length > 2e4) text = text.slice(0, 2e4) + "\n…(truncated)";
+        state.draftAttachments.push({ kind: "text", name: file.name, text });
+        dom.input.value = `${dom.input.value}${dom.input.value ? "\n\n" : ""}File "${file.name}":
 ${text}`.slice(0, 26e3);
-      autosize();
-      toast("File contents added to the message", "ok");
-    }
-    updateComposerHint();
+        autosize();
+        toast("File contents added to the message", "ok");
+      }
+      updateComposerHint();
+    });
   }
   A.chat = {
     state,
@@ -7324,6 +7736,26 @@ var __spreadValues = (a, b) => {
   return a;
 };
 var __spreadProps = (a, b) => __defProps(a, __getOwnPropDescs(b));
+var __async = (__this, __arguments, generator) => {
+  return new Promise((resolve, reject) => {
+    var fulfilled = (value) => {
+      try {
+        step(generator.next(value));
+      } catch (e) {
+        reject(e);
+      }
+    };
+    var rejected = (value) => {
+      try {
+        step(generator.throw(value));
+      } catch (e) {
+        reject(e);
+      }
+    };
+    var step = (x) => x.done ? resolve(x.value) : Promise.resolve(x.value).then(fulfilled, rejected);
+    step((generator = generator.apply(__this, __arguments)).next());
+  });
+};
 (function() {
   "use strict";
   const A = window.A;
@@ -7515,7 +7947,7 @@ var __spreadProps = (a, b) => __defProps(a, __getOwnPropDescs(b));
         resolve(false);
         render();
       });
-      wrap.querySelector("#pk-save").addEventListener("click", async () => {
+      wrap.querySelector("#pk-save").addEventListener("click", () => __async(null, null, function* () {
         var _a2;
         const key = wrap.querySelector("#pk").value.trim();
         const url = wrap.querySelector("#pk-url").value.trim();
@@ -7525,7 +7957,7 @@ var __spreadProps = (a, b) => __defProps(a, __getOwnPropDescs(b));
         A.settings.set("providerOverrides", A.settings.get("providerOverrides"));
         if (key) A.settings.setKey(provider.id, key);
         status.innerHTML = '<span class="muted">Testing…</span>';
-        const res = await A.providerClient.check(provider);
+        const res = yield A.providerClient.check(provider);
         status.innerHTML = res.ok ? '<span style="color:var(--ok)">Connected ✓</span>' : `<span style="color:var(--err)">${esc(res.message)}</span>`;
         if (res.ok) {
           toast(`${provider.name} connected`, "ok");
@@ -7534,7 +7966,7 @@ var __spreadProps = (a, b) => __defProps(a, __getOwnPropDescs(b));
         } else if (key) {
           resolve(true);
         }
-      });
+      }));
     });
   }
   function providerSheet() {
@@ -7586,26 +8018,28 @@ var __spreadProps = (a, b) => __defProps(a, __getOwnPropDescs(b));
       toast("Custom model added", "ok");
     });
   }
-  async function syncModels({ force = false } = {}) {
-    if (ui.syncing) return;
-    if (!A.net.online) return toast("You are offline — using the built-in catalog", "", 2400);
-    ui.syncing = true;
-    const btn = $("#btn-sync-models");
-    btn == null ? void 0 : btn.classList.add("is-loading");
-    toast("Syncing model lists…", "", 1600);
-    try {
-      const res = await A.discovery.syncAll({ force });
-      await A.discovery.syncFeed({});
-      const total = res.added || 0;
-      toast(total ? `${total} new model${total > 1 ? "s" : ""} added` : `Catalog refreshed · ${A.catalog.all().length} models`, "ok", 2600);
-      render();
-      A.app.updateModelChip();
-    } catch (err) {
-      toast("Sync failed: " + err.message, "err");
-    } finally {
-      ui.syncing = false;
-      btn == null ? void 0 : btn.classList.remove("is-loading");
-    }
+  function syncModels() {
+    return __async(this, arguments, function* ({ force = false } = {}) {
+      if (ui.syncing) return;
+      if (!A.net.online) return toast("You are offline — using the built-in catalog", "", 2400);
+      ui.syncing = true;
+      const btn = $("#btn-sync-models");
+      btn == null ? void 0 : btn.classList.add("is-loading");
+      toast("Syncing model lists…", "", 1600);
+      try {
+        const res = yield A.discovery.syncAll({ force });
+        yield A.discovery.syncFeed({});
+        const total = res.added || 0;
+        toast(total ? `${total} new model${total > 1 ? "s" : ""} added` : `Catalog refreshed · ${A.catalog.all().length} models`, "ok", 2600);
+        render();
+        A.app.updateModelChip();
+      } catch (err) {
+        toast("Sync failed: " + err.message, "err");
+      } finally {
+        ui.syncing = false;
+        btn == null ? void 0 : btn.classList.remove("is-loading");
+      }
+    });
   }
   function mount() {
     $("#btn-sync-models").addEventListener("click", () => syncModels({ force: true }));
@@ -7634,6 +8068,26 @@ var __spreadProps = (a, b) => __defProps(a, __getOwnPropDescs(b));
 
 </script>
 <script>
+var __async = (__this, __arguments, generator) => {
+  return new Promise((resolve, reject) => {
+    var fulfilled = (value) => {
+      try {
+        step(generator.next(value));
+      } catch (e) {
+        reject(e);
+      }
+    };
+    var rejected = (value) => {
+      try {
+        step(generator.throw(value));
+      } catch (e) {
+        reject(e);
+      }
+    };
+    var step = (x) => x.done ? resolve(x.value) : Promise.resolve(x.value).then(fulfilled, rejected);
+    step((generator = generator.apply(__this, __arguments)).next());
+  });
+};
 (function() {
   "use strict";
   const A = window.A;
@@ -7641,9 +8095,11 @@ var __spreadProps = (a, b) => __defProps(a, __getOwnPropDescs(b));
   const esc = A.util.escapeHtml;
   let tasks = [];
   let currentRun = null;
-  async function load() {
-    tasks = (await A.store.DB.getTasks()).sort((a, b) => b.created - a.created);
-    render();
+  function load() {
+    return __async(this, null, function* () {
+      tasks = (yield A.store.DB.getTasks()).sort((a, b) => b.created - a.created);
+      render();
+    });
   }
   function render() {
     const host = $("#agent-tasks");
@@ -7713,13 +8169,13 @@ var __spreadProps = (a, b) => __defProps(a, __getOwnPropDescs(b));
       A.chat.autosize();
       input.focus();
     });
-    card.querySelector("[data-del]").addEventListener("click", async () => {
-      const ok = await A.ui.confirmDialog("Delete this run?", "The task and its step log will be removed from this device.", { okLabel: "Delete", danger: true });
+    card.querySelector("[data-del]").addEventListener("click", () => __async(null, null, function* () {
+      const ok = yield A.ui.confirmDialog("Delete this run?", "The task and its step log will be removed from this device.", { okLabel: "Delete", danger: true });
       if (!ok) return;
-      await A.store.DB.deleteTask(t.id);
+      yield A.store.DB.deleteTask(t.id);
       tasks = tasks.filter((x) => x.id !== t.id);
       render();
-    });
+    }));
     return card;
   }
   function showTask(t) {
@@ -7746,15 +8202,17 @@ var __spreadProps = (a, b) => __defProps(a, __getOwnPropDescs(b));
     openSheet("Agent run", wrap);
     A.markdown.bindCopy(wrap);
   }
-  async function runFromScreen() {
-    const input = $("#agent-goal");
-    const goal = input.value.trim();
-    if (!goal) return toast("Type a goal first", "", 1600);
-    input.value = "";
-    A.app.go("chat");
-    A.chat.setMode("agent");
-    await A.chat.send(goal);
-    load();
+  function runFromScreen() {
+    return __async(this, null, function* () {
+      const input = $("#agent-goal");
+      const goal = input.value.trim();
+      if (!goal) return toast("Type a goal first", "", 1600);
+      input.value = "";
+      A.app.go("chat");
+      A.chat.setMode("agent");
+      yield A.chat.send(goal);
+      load();
+    });
   }
   function mount() {
     render();
@@ -7790,7 +8248,7 @@ var __spreadProps = (a, b) => __defProps(a, __getOwnPropDescs(b));
           <button class="btn btn-primary btn-block" id="skill-run">${icon("play")} Run skill</button>
           <pre id="skill-out" class="mono" style="margin-top:12px;white-space:pre-wrap;max-height:220px;overflow:auto"></pre>`;
         openSheet(skill.title, wrap);
-        wrap.querySelector("#skill-run").addEventListener("click", async () => {
+        wrap.querySelector("#skill-run").addEventListener("click", () => __async(null, null, function* () {
           const out = wrap.querySelector("#skill-out");
           let input = {};
           try {
@@ -7801,12 +8259,12 @@ var __spreadProps = (a, b) => __defProps(a, __getOwnPropDescs(b));
           }
           out.textContent = "Running…";
           try {
-            const res = await A.skills.run(skill.id, input);
+            const res = yield A.skills.run(skill.id, input);
             out.textContent = JSON.stringify(res, null, 2);
           } catch (err) {
             out.textContent = "Error: " + err.message;
           }
-        });
+        }));
       });
     });
   }
@@ -8023,6 +8481,26 @@ var __objRest = (source, exclude) => {
     }
   return target;
 };
+var __async = (__this, __arguments, generator) => {
+  return new Promise((resolve, reject) => {
+    var fulfilled = (value) => {
+      try {
+        step(generator.next(value));
+      } catch (e) {
+        reject(e);
+      }
+    };
+    var rejected = (value) => {
+      try {
+        step(generator.throw(value));
+      } catch (e) {
+        reject(e);
+      }
+    };
+    var step = (x) => x.done ? resolve(x.value) : Promise.resolve(x.value).then(fulfilled, rejected);
+    step((generator = generator.apply(__this, __arguments)).next());
+  });
+};
 (function() {
   "use strict";
   const A = window.A;
@@ -8208,8 +8686,8 @@ var __objRest = (source, exclude) => {
       checked: s.get("haptics"),
       onChange: (v) => s.set("haptics", v)
     });
-    host.querySelector("#btn-persona").addEventListener("click", async () => {
-      const value = await A.ui.promptDialog({
+    host.querySelector("#btn-persona").addEventListener("click", () => __async(null, null, function* () {
+      const value = yield A.ui.promptDialog({
         title: "Custom instructions",
         label: "Tell every cloud model who you are",
         multiline: true,
@@ -8222,7 +8700,7 @@ var __objRest = (source, exclude) => {
         s.set("systemPrompt", value);
         toast(value ? "Custom instructions saved" : "Custom instructions cleared", "ok");
       }
-    });
+    }));
     const tempHost = host.querySelector("#temp-host");
     tempHost.className = "setting-group";
     tempHost.innerHTML = `<h3>Creativity</h3><div class="setting-card" id="temp-card"></div>`;
@@ -8284,41 +8762,41 @@ var __objRest = (source, exclude) => {
     );
     host.querySelector("#btn-pick-model").addEventListener("click", () => A.app.go("models"));
     host.querySelector("#btn-providers").addEventListener("click", () => A.screens.models.providerSheet());
-    host.querySelector("#btn-test-model").addEventListener("click", async (e) => {
+    host.querySelector("#btn-test-model").addEventListener("click", (e) => __async(null, null, function* () {
       const btn = e.currentTarget;
       btn.textContent = "Testing…";
-      const res = await A.ai.testModel(A.settings.get("selectedModel"));
+      const res = yield A.ai.testModel(A.settings.get("selectedModel"));
       btn.textContent = "Test";
       toast(res.ok ? `OK — ${res.text || "connected"}` : res.message, res.ok ? "ok" : "err", 3600);
-    });
+    }));
     host.querySelector("#btn-memories").addEventListener("click", showMemories);
     host.querySelector("#btn-notes").addEventListener("click", showNotes);
     host.querySelector("#btn-export").addEventListener("click", exportAll);
     host.querySelector("#btn-import").addEventListener("click", importBackup);
     host.querySelector("#btn-install").addEventListener("click", () => A.app.installPrompt());
     const phoneStatus = host.querySelector("#phone-status");
-    const describePhone = async () => {
+    const describePhone = () => __async(null, null, function* () {
       var _a2;
       if (!phoneStatus) return;
       if (!A.phone.available()) {
         phoneStatus.innerHTML = "Phone control needs the <strong>Android app</strong>. In this browser it stays read-only.";
         return;
       }
-      const cap = await A.phone.capabilities();
+      const cap = yield A.phone.capabilities();
       const on = Object.entries(cap.features || {}).filter(([, v]) => v).map(([k]) => k);
       phoneStatus.innerHTML = `${cap.model || "This phone"} · Android ${cap.androidVersion || "?"} — <strong>${on.length} capabilities</strong> active${((_a2 = cap.features) == null ? void 0 : _a2.accessibilityClicks) ? "" : " · screen taps need the accessibility switch"}`;
-    };
+    });
     describePhone();
-    const runSelfTest = async () => {
+    const runSelfTest = () => __async(null, null, function* () {
       const rows = [];
-      const step = async (label, fn) => {
+      const step = (label, fn) => __async(null, null, function* () {
         try {
-          const detail = await fn();
+          const detail = yield fn();
           rows.push({ ok: true, label, detail: detail || "" });
         } catch (err) {
           rows.push({ ok: false, label, detail: err && err.message ? err.message : String(err) });
         }
-      };
+      });
       if (!A.phone.available()) {
         openSheet("Phone self-test", `<div class="card" style="padding:14px">
           <p class="small"><strong>This is the browser build.</strong> Phone control only exists inside the Android app.</p>
@@ -8326,48 +8804,48 @@ var __objRest = (source, exclude) => {
         </div>`);
         return;
       }
-      await step("Native plugin loaded", async () => {
+      yield step("Native plugin loaded", () => __async(null, null, function* () {
         if (!A.phone.available()) throw new Error("PhoneControl plugin is not registered in this build");
         return "PhoneControl found";
-      });
-      await step("Plugin answers (capabilities)", async () => {
-        const cap = await A.phone.capabilities();
+      }));
+      yield step("Plugin answers (capabilities)", () => __async(null, null, function* () {
+        const cap = yield A.phone.capabilities();
         if (cap.error) throw new Error(cap.error);
         const on = Object.entries(cap.features || {}).filter(([, v]) => v).map(([k]) => k);
         if (!on.length) throw new Error("plugin replied but reports no capabilities");
         return `${cap.model || "this phone"} · Android ${cap.androidVersion || "?"} · ${on.length} on`;
-      });
-      await step("Device status (battery / volume / storage)", async () => {
-        const st = await A.phone.call("status", {});
+      }));
+      yield step("Device status (battery / volume / storage)", () => __async(null, null, function* () {
+        const st = yield A.phone.call("status", {});
         const bits = [];
         if (typeof st.battery === "number") bits.push(`${st.battery}% battery`);
         if (st.storage) bits.push(`${st.storage}`);
         if (!bits.length) throw new Error("status returned nothing useful");
         return bits.join(" · ");
-      });
-      await step("Installed apps readable", async () => {
-        const apps = await A.phone.call("listApps", {});
+      }));
+      yield step("Installed apps readable", () => __async(null, null, function* () {
+        const apps = yield A.phone.call("listApps", {});
         const n = (apps.apps || []).length;
         if (!n) throw new Error("no launchable apps returned");
         return `${n} apps`;
-      });
-      await step("Alarm / timer intent reachable", async () => {
-        const cap = await A.phone.capabilities();
+      }));
+      yield step("Alarm / timer intent reachable", () => __async(null, null, function* () {
+        const cap = yield A.phone.capabilities();
         const ok = cap.features && (cap.features.alarms || cap.features.timers);
         if (!ok) throw new Error("no clock app on this phone accepts alarms");
         return "a clock app will take them";
-      });
-      await step("Accessibility (screen taps)", async () => {
-        const st = await A.phone.call("accessibilityStatus", {});
+      }));
+      yield step("Accessibility (screen taps)", () => __async(null, null, function* () {
+        const st = yield A.phone.call("accessibilityStatus", {});
         if (!st.enabled) throw new Error("off — tap “Screen control” below to turn it on");
         return "enabled";
-      });
-      await step("Last stored request", async () => {
+      }));
+      yield step("Last stored request", () => __async(null, null, function* () {
         const h = A.phoneActions.history();
         if (!h.length) return "none yet";
         const last = h[0];
         return `${last.action || "?"} — ${last.ok ? "worked" : "failed"}`;
-      });
+      }));
       const passed = rows.filter((r) => r.ok).length;
       const body = `<div class="card" style="padding:14px">
         <p class="small"><strong>${passed}/${rows.length} checks passed</strong></p>
@@ -8379,39 +8857,39 @@ var __objRest = (source, exclude) => {
       </div>`;
       openSheet("Phone self-test", body);
       if (phoneStatus) phoneStatus.innerHTML = `<strong>${passed}/${rows.length}</strong> checks passed.`;
-    };
+    });
     (_b = host.querySelector("#btn-phone-check")) == null ? void 0 : _b.addEventListener("click", runSelfTest);
-    (_c = host.querySelector("#btn-phone-access")) == null ? void 0 : _c.addEventListener("click", async () => {
+    (_c = host.querySelector("#btn-phone-access")) == null ? void 0 : _c.addEventListener("click", () => __async(null, null, function* () {
       try {
         if (!A.phone.available()) throw new Error("Install the Android app to control the phone.");
-        const st = await A.phone.call("accessibilityStatus", {});
+        const st = yield A.phone.call("accessibilityStatus", {});
         if (st.enabled) {
           toast("Screen control is already on", "ok");
           return;
         }
-        await A.phone.call("openAccessibilitySettings", {});
+        yield A.phone.call("openAccessibilitySettings", {});
         toast("Enable “Ai'sHub control” in the list", "", 5e3);
       } catch (err) {
         toast(err.message, "err", 4e3);
       }
-    });
+    }));
     (_d = host.querySelector("#btn-phone-log")) == null ? void 0 : _d.addEventListener("click", () => {
       const list = A.phoneActions.history();
       const body = list.length ? `<div class="vstack" style="gap:8px">${list.slice(0, 30).map((h) => `<div class="small"><span class="muted">${new Date(h.ts).toLocaleString()}</span><br><strong>${esc(h.action || "")}</strong> — ${esc(h.request || "")}${h.ok ? "" : `<br><span class="warn">${esc(h.message || "failed")}</span>`}</div>`).join("")}</div>` : '<p class="small muted">Nothing yet. Ask me to set an alarm or open an app.</p>';
       openSheet("Phone activity", `<div class="card" style="padding:14px">${body}</div>`);
     });
-    host.querySelector("#btn-clear-chats").addEventListener("click", async () => {
-      const ok = await A.ui.confirmDialog("Clear all chats?", "Every conversation on this device will be deleted. This cannot be undone.", { okLabel: "Clear", danger: true });
+    host.querySelector("#btn-clear-chats").addEventListener("click", () => __async(null, null, function* () {
+      const ok = yield A.ui.confirmDialog("Clear all chats?", "Every conversation on this device will be deleted. This cannot be undone.", { okLabel: "Clear", danger: true });
       if (!ok) return;
       A.chatStore.clearAll();
       A.chat.newChat({ silent: true });
       toast("All chats cleared", "ok");
-    });
-    host.querySelector("#btn-reset").addEventListener("click", async () => {
-      const ok = await A.ui.confirmDialog("Reset Ai'sHub?", "Chats, keys, notes, memories and settings will be erased.", { okLabel: "Reset everything", danger: true });
+    }));
+    host.querySelector("#btn-reset").addEventListener("click", () => __async(null, null, function* () {
+      const ok = yield A.ui.confirmDialog("Reset Ai'sHub?", "Chats, keys, notes, memories and settings will be erased.", { okLabel: "Reset everything", danger: true });
       if (!ok) return;
       A.chatStore.clearAll();
-      await A.store.DB.wipe();
+      yield A.store.DB.wipe();
       Object.keys(localStorage).filter((k) => k.startsWith(A.store.PREFIX)).forEach((k) => localStorage.removeItem(k));
       A.settings.reset();
       A.discovery.reset();
@@ -8421,7 +8899,7 @@ var __objRest = (source, exclude) => {
       A.chat.newChat({ silent: true });
       render();
       toast("App reset", "ok");
-    });
+    }));
     host.querySelector("#btn-about-more").addEventListener("click", showAbout);
   }
   function showMemories() {
@@ -8464,22 +8942,24 @@ var __objRest = (source, exclude) => {
     renderList();
     openSheet("Notes", wrap);
   }
-  async function exportAll() {
-    const data = await A.chatStore.exportAll();
-    data.notes = A.skills.notes.all();
-    data.memories = A.skills.memory.all();
-    A.util.download(`aishub-backup-${(/* @__PURE__ */ new Date()).toISOString().slice(0, 10)}.json`, JSON.stringify(data, null, 2), "application/json");
-    toast("Backup exported", "ok");
+  function exportAll() {
+    return __async(this, null, function* () {
+      const data = yield A.chatStore.exportAll();
+      data.notes = A.skills.notes.all();
+      data.memories = A.skills.memory.all();
+      A.util.download(`aishub-backup-${(/* @__PURE__ */ new Date()).toISOString().slice(0, 10)}.json`, JSON.stringify(data, null, 2), "application/json");
+      toast("Backup exported", "ok");
+    });
   }
   function importBackup() {
     const input = document.createElement("input");
     input.type = "file";
     input.accept = "application/json";
-    input.addEventListener("change", async () => {
+    input.addEventListener("change", () => __async(null, null, function* () {
       const file = input.files[0];
       if (!file) return;
       try {
-        const data = JSON.parse(await A.util.readFileAsText(file));
+        const data = JSON.parse(yield A.util.readFileAsText(file));
         if (data.settings) A.settings.patch(data.settings, { silent: true });
         if (Array.isArray(data.notes)) A.store.KV.set("notes", data.notes);
         if (Array.isArray(data.memories)) A.store.KV.set("memory", data.memories);
@@ -8489,7 +8969,7 @@ var __objRest = (source, exclude) => {
           const chats = A.chatStore.list();
           if (!chats.some((c) => c.id === meta.id)) {
             A.store.KV.set("chats", [meta, ...chats]);
-            await A.store.DB.putMessages(meta.id, messages || []);
+            yield A.store.DB.putMessages(meta.id, messages || []);
             imported++;
           }
         }
@@ -8499,7 +8979,7 @@ var __objRest = (source, exclude) => {
       } catch (err) {
         toast("Import failed: " + err.message, "err");
       }
-    });
+    }));
     input.click();
   }
   function showAbout() {
@@ -8543,6 +9023,26 @@ var __objRest = (source, exclude) => {
 
 </script>
 <script>
+var __async = (__this, __arguments, generator) => {
+  return new Promise((resolve, reject) => {
+    var fulfilled = (value) => {
+      try {
+        step(generator.next(value));
+      } catch (e) {
+        reject(e);
+      }
+    };
+    var rejected = (value) => {
+      try {
+        step(generator.throw(value));
+      } catch (e) {
+        reject(e);
+      }
+    };
+    var step = (x) => x.done ? resolve(x.value) : Promise.resolve(x.value).then(fulfilled, rejected);
+    step((generator = generator.apply(__this, __arguments)).next());
+  });
+};
 (function() {
   "use strict";
   const A = window.A;
@@ -8638,24 +9138,24 @@ var __objRest = (source, exclude) => {
     }
     host.innerHTML = html;
     host.querySelectorAll("[data-chat]").forEach((node) => {
-      node.addEventListener("click", async (e) => {
+      node.addEventListener("click", (e) => __async(null, null, function* () {
         if (e.target.closest("[data-del]")) return;
-        await A.chat.openChat(node.getAttribute("data-chat"));
+        yield A.chat.openChat(node.getAttribute("data-chat"));
         closeDrawer();
         go("chat");
-      });
+      }));
     });
     host.querySelectorAll("[data-del]").forEach((btn) => {
-      btn.addEventListener("click", async (e) => {
+      btn.addEventListener("click", (e) => __async(null, null, function* () {
         e.stopPropagation();
         const id = btn.getAttribute("data-del");
         const chat = A.chatStore.get(id);
-        const ok = await A.ui.confirmDialog("Delete chat?", `"${(chat == null ? void 0 : chat.title) || "This chat"}" will be removed from this device.`, { okLabel: "Delete", danger: true });
+        const ok = yield A.ui.confirmDialog("Delete chat?", `"${(chat == null ? void 0 : chat.title) || "This chat"}" will be removed from this device.`, { okLabel: "Delete", danger: true });
         if (!ok) return;
-        await A.chatStore.remove(id);
-        if (A.chat.state.chatId === id) await A.chat.newChat({ silent: true });
+        yield A.chatStore.remove(id);
+        if (A.chat.state.chatId === id) yield A.chat.newChat({ silent: true });
         renderChats($("#chats-search").value);
-      });
+      }));
     });
   }
   function openDrawer() {
@@ -8768,12 +9268,12 @@ var __objRest = (source, exclude) => {
     $("#btn-menu").addEventListener("click", openDrawer);
     $("#drawer-close").addEventListener("click", closeDrawer);
     $("#drawer-backdrop").addEventListener("click", closeDrawer);
-    $("#drawer-new").addEventListener("click", async () => {
-      await A.chat.newChat({ silent: true });
+    $("#drawer-new").addEventListener("click", () => __async(null, null, function* () {
+      yield A.chat.newChat({ silent: true });
       go("chat");
       closeDrawer();
       $("#input").focus();
-    });
+    }));
     $("#chats-search").addEventListener("input", A.util.debounce((e) => renderChats(e.target.value), 120));
     $("#drawer-about").addEventListener("click", () => {
       closeDrawer();
@@ -8784,10 +9284,10 @@ var __objRest = (source, exclude) => {
         return A.screens.settings && ((_a = document.querySelector("#btn-about-more")) == null ? void 0 : _a.click());
       }, 120);
     });
-    $("#btn-new-chat").addEventListener("click", async () => {
-      await A.chat.newChat();
+    $("#btn-new-chat").addEventListener("click", () => __async(null, null, function* () {
+      yield A.chat.newChat();
       go("chat");
-    });
+    }));
     $("#btn-model-chip").addEventListener("click", () => {
       A.app.go("models");
     });
@@ -8855,78 +9355,80 @@ var __objRest = (source, exclude) => {
       }
     });
   }
-  async function start() {
-    applyTheme();
-    A.i18n.init();
-    A.chat.cache();
-    wire();
-    A.screens.models.mount();
-    A.screens.agent.mount();
-    A.screens.prompts.mount();
-    A.screens.settings.mount();
-    const lastId = A.settings.get("lastChatId");
-    if (lastId && A.chatStore.get(lastId)) await A.chat.openChat(lastId);
-    else await A.chat.newChat({ silent: true });
-    go("chat");
-    updateModelChip();
-    updateNetLabel();
-    initReminders();
-    registerSW();
-    stampBuild();
-    const splash = $("#splash");
-    setTimeout(() => splash.classList.add("is-gone"), 260);
-    setTimeout(() => splash.remove(), 900);
-    setTimeout(() => firstRun(), 700);
-    if (A.discovery.shouldAutoSync()) {
-      A.discovery.syncAll({}).then((res) => {
-        if (res && res.added) {
-          A.screens.models.render();
-          updateModelChip();
-        }
-      }).catch(() => {
-      });
-    }
-    const params = new URLSearchParams(location.search);
-    const action = params.get("action");
-    if (action === "new-chat") A.chat.newChat({ silent: true });
-    if (action === "agent") {
-      A.chat.setMode("agent");
+  function start() {
+    return __async(this, null, function* () {
+      applyTheme();
+      A.i18n.init();
+      A.chat.cache();
+      wire();
+      A.screens.models.mount();
+      A.screens.agent.mount();
+      A.screens.prompts.mount();
+      A.screens.settings.mount();
+      const lastId = A.settings.get("lastChatId");
+      if (lastId && A.chatStore.get(lastId)) yield A.chat.openChat(lastId);
+      else yield A.chat.newChat({ silent: true });
       go("chat");
-    }
-    window.addEventListener("online", () => {
+      updateModelChip();
       updateNetLabel();
-      A.chat.updateComposerHint();
-      toast("Back online", "ok", 1600);
-      if (A.discovery.shouldAutoSync()) A.discovery.syncAll({}).then(() => A.app.updateModelChip()).catch(() => {
+      initReminders();
+      registerSW();
+      stampBuild();
+      const splash = $("#splash");
+      setTimeout(() => splash.classList.add("is-gone"), 260);
+      setTimeout(() => splash.remove(), 900);
+      setTimeout(() => firstRun(), 700);
+      if (A.discovery.shouldAutoSync()) {
+        A.discovery.syncAll({}).then((res) => {
+          if (res && res.added) {
+            A.screens.models.render();
+            updateModelChip();
+          }
+        }).catch(() => {
+        });
+      }
+      const params = new URLSearchParams(location.search);
+      const action = params.get("action");
+      if (action === "new-chat") A.chat.newChat({ silent: true });
+      if (action === "agent") {
+        A.chat.setMode("agent");
+        go("chat");
+      }
+      window.addEventListener("online", () => {
+        updateNetLabel();
+        A.chat.updateComposerHint();
+        toast("Back online", "ok", 1600);
+        if (A.discovery.shouldAutoSync()) A.discovery.syncAll({}).then(() => A.app.updateModelChip()).catch(() => {
+        });
       });
-    });
-    window.addEventListener("offline", () => {
-      updateNetLabel();
-      A.chat.updateComposerHint();
-      toast("Offline — switched to the on-device engine", "", 3200);
-    });
-    const mql = media("(prefers-color-scheme: dark)");
-    (mql.addEventListener ? mql.addEventListener.bind(mql) : mql.addListener.bind(mql))("change", () => {
-      if (A.settings.get("theme") === "system") applyTheme();
-    });
-    window.addEventListener("beforeinstallprompt", (e) => {
-      e.preventDefault();
-      installEvent = e;
-    });
-    A.bus.on("model:changed", updateModelChip);
-    A.bus.on("chats:changed", () => {
-      if (!$("#drawer").hidden) renderChats($("#chats-search").value);
-    });
-    A.bus.on("models:new", (models) => {
-      if (!models || !models.length) return;
-      toast(`${models.length} new model${models.length > 1 ? "s" : ""} added automatically`, "ok", 3200);
-    });
-    document.addEventListener("visibilitychange", () => {
-      if (!document.hidden && A.discovery.shouldAutoSync()) A.discovery.syncAll({}).catch(() => {
+      window.addEventListener("offline", () => {
+        updateNetLabel();
+        A.chat.updateComposerHint();
+        toast("Offline — switched to the on-device engine", "", 3200);
       });
+      const mql = media("(prefers-color-scheme: dark)");
+      (mql.addEventListener ? mql.addEventListener.bind(mql) : mql.addListener.bind(mql))("change", () => {
+        if (A.settings.get("theme") === "system") applyTheme();
+      });
+      window.addEventListener("beforeinstallprompt", (e) => {
+        e.preventDefault();
+        installEvent = e;
+      });
+      A.bus.on("model:changed", updateModelChip);
+      A.bus.on("chats:changed", () => {
+        if (!$("#drawer").hidden) renderChats($("#chats-search").value);
+      });
+      A.bus.on("models:new", (models) => {
+        if (!models || !models.length) return;
+        toast(`${models.length} new model${models.length > 1 ? "s" : ""} added automatically`, "ok", 3200);
+      });
+      document.addEventListener("visibilitychange", () => {
+        if (!document.hidden && A.discovery.shouldAutoSync()) A.discovery.syncAll({}).catch(() => {
+        });
+      });
+      window.AIHUB_BOOTED = true;
+      document.documentElement.setAttribute("data-boot", "ready");
     });
-    window.AIHUB_BOOTED = true;
-    document.documentElement.setAttribute("data-boot", "ready");
   }
   A.app = {
     go,
