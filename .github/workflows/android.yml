@@ -95,22 +95,25 @@ jobs:
         run: npm test
       - name: Check Android resources before Gradle runs
         run: |
-          # aapt2 fails the whole build on one unescaped apostrophe ("Can not
-          # extract resource"), which is a slow, confusing round trip. Catch it here.
-          node -e '
-            const fs = require("fs"), path = require("path");
-            const dir = "android/app/src/main/res/values";
-            let bad = 0;
-            for (const f of fs.readdirSync(dir)) {
-              if (!f.endsWith(".xml")) continue;
-              const src = fs.readFileSync(path.join(dir, f), "utf8");
-              for (const m of src.matchAll(/<(string|item)[^>]*name="([^"]+)"[^>]*>([\s\S]*?)<\/\1>/g)) {
-                if (/(?<!\\)'/.test(m[3])) { console.error(`::error::${f}: unescaped apostrophe in "${m[2]}"`); bad++; }
-              }
-            }
-            if (bad) process.exit(1);
-            console.log("resources: no unescaped apostrophes");
-          '
+          # aapt2 aborts the whole build on a single unescaped apostrophe
+          # ("Can not extract resource"). Catch it in a second, not a build.
+          python3 - <<'PYEOF'
+          import re, pathlib, sys
+          bad = 0
+          for f in sorted(pathlib.Path("android/app/src/main/res/values").glob("*.xml")):
+              src = f.read_text(encoding="utf-8")
+              for m in re.finditer(r'<(string|item)[^>]*name="([^"]+)"[^>]*>(.*?)</\1>', src, re.S):
+                  body = m.group(3)
+                  # a backslash-escaped apostrophe is fine; a bare one is not
+                  for i, ch in enumerate(body):
+                      if ch == "'" and (i == 0 or body[i - 1] != "\\"):
+                          print(f"::error file={f}::unescaped apostrophe in \"{m.group(2)}\"")
+                          bad += 1
+                          break
+          if bad:
+              sys.exit(1)
+          print("resources: apostrophes are escaped")
+          PYEOF
 
       - name: Provision the release signing key
         env:
