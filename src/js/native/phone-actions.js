@@ -135,6 +135,13 @@
 
   const reply = (text) => ({ text, ok: true });
 
+  /** Never let a missing native detail leak "undefined" into the chat. */
+  const tail = (res, sep = '\u2014') => {
+    const m = res && typeof res.message === 'string' ? res.message.trim().replace(/\.$/, '') : '';
+    return m ? ` ${sep} ${m}` : '';
+  };
+  const clean = (text) => String(text).replace(/\s*\u2014\s*\./g, '.').replace(/\s+([.,])/g, '$1').trim();
+
   async function perform(name, match, text) {
     switch (name) {
       case 'alarm': {
@@ -142,13 +149,13 @@
         if (!time) return { ok: false, text: 'Tell me the time, like “set an alarm for 7:30 am”.' };
         const label = (text.match(/\b(?:labell?ed|called|for)\s+([a-z0-9 '\-]{2,40})$/i) || [])[1];
         const res = await A.phone.call('setAlarm', { hour: time.hour, minute: time.minute, label: label?.trim() || "Ai'sHub alarm" });
-        return reply(`Alarm set for ${String(time.hour).padStart(2, '0')}:${String(time.minute).padStart(2, '0')} — ${res.message}.`);
+        return reply(clean(`Alarm set for ${String(time.hour).padStart(2, '0')}:${String(time.minute).padStart(2, '0')}${tail(res)}.`));
       }
       case 'timer': {
         const seconds = parseDuration(text);
         if (!seconds) return { ok: false, text: 'How long? Try “set a timer for 10 minutes”.' };
         const res = await A.phone.call('setTimer', { seconds, label: "Ai'sHub timer" });
-        return reply(`Timer started — ${res.message}.`);
+        return reply(clean(`Timer started${tail(res)}.`));
       }
       case 'event': {
         const title = (text.match(/\b(?:add|create|schedule|put)\s+(?:a\s+)?(?:meeting|event|appointment)\s*(?:called|for|titled|:)?\s*([^,.]+)/i) || [])[1];
@@ -160,7 +167,7 @@
           end: begin + 3600_000,
         });
         const when = new Date(begin).toLocaleString();
-        return reply(`Opening your calendar to add “${(title || 'Ai\'sHub event').trim()}” for ${when}. ${res.message}`);
+        return reply(clean(`Opening your calendar to add “${(title || 'Ai\'sHub event').trim()}” for ${when}.${tail(res, '')}`));
       }
       case 'agenda': {
         const res = await A.phone.call('readEvents', {});
@@ -182,14 +189,14 @@
         const number = extractNumber(text) || (text.match(/\bcall\s+(?:the\s+)?([a-z0-9 .'\-]{2,40})/i) || [])[1];
         if (!number) return { ok: false, text: 'Who should I call? Give me a name or a number.' };
         const res = await A.phone.call('call', { number: String(number).trim() });
-        return reply(`${res.message}.`);
+        return reply(clean(`Done${tail(res)}.`));
       }
       case 'sms': {
         const body = (text.match(/\b(?:saying|that says|with (?:the )?message)\s+(.+)$/i) || [])[1];
         const target = (text.match(/\b(?:text|sms|message|whatsapp)\s+(?:to\s+)?([+()\d][\d\s()\-]{5,}|\d{5,})/i) || [])[1];
         if (!target) return { ok: false, text: 'Give me the number to text, like “text 01712345678 that I will be late”.' };
         const res = await A.phone.call('sms', { number: String(target).trim(), body: body || '' });
-        return reply(`${res.message}${body ? ' Your message is filled in.' : ''}`);
+        return reply(clean(`Message ready${tail(res)}.${body ? ' Your message is filled in.' : ''}`));
       }
       case 'openApp': {
         const raw = (match[2] || '').trim().toLowerCase();
@@ -199,7 +206,7 @@
           const hit = (apps.apps || []).find((a) => a.label.toLowerCase() === raw || a.label.toLowerCase().includes(raw));
           if (!hit) return { ok: false, text: `I could not find an app called “${raw}” on this phone.` };
           const res = await A.phone.call('openApp', { package: hit.package });
-          return reply(`Opened **${hit.label}**. ${res.message}`);
+          return reply(clean(`Opened **${hit.label}**.${tail(res, '')}`));
         }
         const res = await A.phone.call('openApp', { package: pkg });
         return reply(`Opened **${raw}**.`);
@@ -211,11 +218,11 @@
           return reply(`Android does not let apps flip ${which} directly, so I opened the ${which} settings for you — one tap there and it is on.`);
         }
         const res = await A.phone.call('openSettings', { which });
-        return reply(`${res.message}.`);
+        return reply(clean(`Done${tail(res)}.`));
       }
       case 'torchOn': {
         const res = await A.phone.call('torch', { on: true });
-        return reply(`Flashlight on. ${res.message}`);
+        return reply(clean(`Flashlight on.${tail(res, '')}`));
       }
       case 'torchOff': {
         await A.phone.call('torch', { on: false });
@@ -227,17 +234,17 @@
           const max = (await A.phone.call('status', {})).volumeMax || 15;
           const target = Math.round((Number(level) / 100) * max);
           const res = await A.phone.call('volume', { level: Math.max(0, Math.min(max, target)) });
-          return reply(`Volume set to about ${level}%. ${res.message}`);
+          return reply(clean(`Volume set to about ${level}%.${tail(res, '')}`));
         }
         const dir = /\b(down|lower|quieter|decrease|reduce)\b/i.test(text) ? 'down' : /\b(mute|silent)\b/i.test(text) ? 'mute' : 'up';
         const res = await A.phone.call('volume', { direction: dir });
-        return reply(`${res.message}.`);
+        return reply(clean(`Done${tail(res)}.`));
       }
       case 'brightness': {
         const pct = (text.match(/(\d{1,3})\s*%/i) || [])[1];
         if (!pct) return reply('Say a level, like “set brightness to 40%”.');
         const res = await A.phone.call('brightness', { level: Math.round((Number(pct) / 100) * 255) });
-        return reply(`${res.message}.`);
+        return reply(clean(`Done${tail(res)}.`));
       }
       case 'clipboard': {
         if (/\bcopy\b/i.test(text)) {

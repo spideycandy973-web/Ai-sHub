@@ -108,7 +108,7 @@
             </div>
             <div class="small muted" id="phone-status">Checking…</div>
             <div class="hstack" style="gap:8px;flex-wrap:wrap">
-              <button class="btn btn-ghost btn-sm" id="btn-phone-check">Check capabilities</button>
+              <button class="btn btn-ghost btn-sm" id="btn-phone-check">Run self-test</button>
               <button class="btn btn-ghost btn-sm" id="btn-phone-access">Screen control</button>
               <button class="btn btn-ghost btn-sm" id="btn-phone-log">Activity</button>
             </div>
@@ -285,7 +285,84 @@
       phoneStatus.innerHTML = `${cap.model || 'This phone'} · Android ${cap.androidVersion || '?'} — <strong>${on.length} capabilities</strong> active${cap.features?.accessibilityClicks ? '' : ' · screen taps need the accessibility switch'}`;
     };
     describePhone();
-    host.querySelector('#btn-phone-check')?.addEventListener('click', describePhone);
+
+    /* A self-test that names the exact failing step, so "it does not work" becomes
+       "step 4 failed because of X" in one press. */
+    const runSelfTest = async () => {
+      const rows = [];
+      const step = async (label, fn) => {
+        try {
+          const detail = await fn();
+          rows.push({ ok: true, label, detail: detail || '' });
+        } catch (err) {
+          rows.push({ ok: false, label, detail: err && err.message ? err.message : String(err) });
+        }
+      };
+
+      if (!A.phone.available()) {
+        openSheet('Phone self-test', `<div class="card" style="padding:14px">
+          <p class="small"><strong>This is the browser build.</strong> Phone control only exists inside the Android app.</p>
+          <p class="small muted">Install <code>AisHub-1.0.0-release.apk</code> from the repo's <em>builds</em> release, then open Ai'sHub from your app drawer — not from Chrome.</p>
+        </div>`);
+        return;
+      }
+
+      await step('Native plugin loaded', async () => {
+        if (!A.phone.available()) throw new Error('PhoneControl plugin is not registered in this build');
+        return 'PhoneControl found';
+      });
+      await step('Plugin answers (capabilities)', async () => {
+        const cap = await A.phone.capabilities();
+        if (cap.error) throw new Error(cap.error);
+        const on = Object.entries(cap.features || {}).filter(([, v]) => v).map(([k]) => k);
+        if (!on.length) throw new Error('plugin replied but reports no capabilities');
+        return `${cap.model || 'this phone'} · Android ${cap.androidVersion || '?'} · ${on.length} on`;
+      });
+      await step('Device status (battery / volume / storage)', async () => {
+        const st = await A.phone.call('status', {});
+        const bits = [];
+        if (typeof st.battery === 'number') bits.push(`${st.battery}% battery`);
+        if (st.storage) bits.push(`${st.storage}`);
+        if (!bits.length) throw new Error('status returned nothing useful');
+        return bits.join(' · ');
+      });
+      await step('Installed apps readable', async () => {
+        const apps = await A.phone.call('listApps', {});
+        const n = (apps.apps || []).length;
+        if (!n) throw new Error('no launchable apps returned');
+        return `${n} apps`;
+      });
+      await step('Alarm / timer intent reachable', async () => {
+        const cap = await A.phone.capabilities();
+        const ok = cap.features && (cap.features.alarms || cap.features.timers);
+        if (!ok) throw new Error('no clock app on this phone accepts alarms');
+        return 'a clock app will take them';
+      });
+      await step('Accessibility (screen taps)', async () => {
+        const st = await A.phone.call('accessibilityStatus', {});
+        if (!st.enabled) throw new Error('off — tap “Screen control” below to turn it on');
+        return 'enabled';
+      });
+      await step('Last stored request', async () => {
+        const h = A.phoneActions.history();
+        if (!h.length) return 'none yet';
+        const last = h[0];
+        return `${last.action || '?'} — ${last.ok ? 'worked' : 'failed'}`;
+      });
+
+      const passed = rows.filter((r) => r.ok).length;
+      const body = `<div class="card" style="padding:14px">
+        <p class="small"><strong>${passed}/${rows.length} checks passed</strong></p>
+        <div class="vstack" style="gap:10px">${rows.map((r) => `<div class="small">
+          <span class="${r.ok ? 'ok' : 'warn'}">${r.ok ? '✓' : '✕'} ${esc(r.label)}</span>
+          ${r.detail ? `<div class="muted">${esc(r.detail)}</div>` : ''}
+        </div>`).join('')}</div>
+        <p class="small muted" style="margin-top:12px">If something is ✕, tell me its exact line and I will fix that step.</p>
+      </div>`;
+      openSheet('Phone self-test', body);
+      if (phoneStatus) phoneStatus.innerHTML = `<strong>${passed}/${rows.length}</strong> checks passed.`;
+    };
+    host.querySelector('#btn-phone-check')?.addEventListener('click', runSelfTest);
     host.querySelector('#btn-phone-access')?.addEventListener('click', async () => {
       try {
         if (!A.phone.available()) throw new Error('Install the Android app to control the phone.');

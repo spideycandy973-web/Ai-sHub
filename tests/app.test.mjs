@@ -371,6 +371,30 @@ test('time and duration parsing handles am/pm, noon and words', () => {
   assert.equal(P.parseDuration('timer for 2 hours'), 7200);
 });
 
+test('native replies never leak "undefined" when the plugin sends no message', async () => {
+  // Simulate the Android bridge: methods resolve with {ok:true} and no message field.
+  const dom = await JSDOM.fromFile('docs/index.html', { runScripts: 'dangerously', pretendToBeVisual: true, url: 'https://localhost/' });
+  const w = dom.window;
+  const silent = () => Promise.resolve({ ok: true });
+  w.Capacitor = {
+    isNativePlatform: () => true,
+    platform: 'android',
+    getPlatform: () => 'android',
+    Plugins: { PhoneControl: { setAlarm: silent, setTimer: silent, capabilities: () => Promise.resolve({ features: { alarms: true } }) } },
+  };
+  await new Promise((r) => setTimeout(r, 500));
+  assert.equal(w.A.phone.available(), true, 'the simulated bridge is detected');
+
+  for (const request of ['set an alarm for 7:30 am', 'set a timer for 10 minutes']) {
+    const res = await w.A.phoneActions.tryHandle(request);
+    assert.ok(res && res.text, `${request} produced a reply`);
+    assert.equal(res.ok, true, 'the action succeeded');
+    assert.ok(!/undefined|null|NaN/.test(res.text), `reply must be clean text, got: ${res.text}`);
+    assert.ok(!/[\u2014]\s*\./.test(res.text), `no dangling dash, got: ${res.text}`);
+  }
+  w.close();
+});
+
 test('on the web, phone actions explain the limitation instead of failing', async () => {
   assert.equal(A.phone.available(), false, 'jsdom has no native bridge');
   const res = await A.phoneActions.tryHandle('set an alarm for 7:30 am');
