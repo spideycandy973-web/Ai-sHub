@@ -236,7 +236,7 @@
     host.querySelector('#theme-host').appendChild(
       A.ui.segmented(
         [{ value: 'dark', label: 'Dark' }, { value: 'light', label: 'Light' }, { value: 'system', label: 'System' }],
-        s.get('theme'),
+        s.get('theme') || 'system',
         (v) => {
           s.set('theme', v);
           A.app.applyTheme();

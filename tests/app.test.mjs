@@ -372,6 +372,52 @@ test('time and duration parsing handles am/pm, noon and words', () => {
   assert.equal(P.parseDuration('timer for 2 hours'), 7200);
 });
 
+test('text is readable in both themes (WCAG contrast on the shipped tokens)', async () => {
+  const html = fs.readFileSync('docs/index.html', 'utf8');
+  const tokensOf = (selector) => {
+    const i = html.indexOf(selector);
+    assert.ok(i >= 0, `${selector} block exists`);
+    const block = html.slice(i, html.indexOf('}', i));
+    const out = {};
+    for (const m of block.matchAll(/--([a-z0-9-]+):\s*([^;]+);/g)) out[m[1]] = m[2].trim();
+    return out;
+  };
+  const rgb = (css) => {
+    const m = String(css).match(/#([0-9a-f]{6})/i);
+    if (!m) return null;
+    return [0, 2, 4].map((i) => parseInt(m[1].slice(i, i + 2), 16));
+  };
+  const lum = (c) => {
+    const ch = c.map((v) => {
+      const x = v / 255;
+      return x <= 0.03928 ? x / 12.92 : Math.pow((x + 0.055) / 1.055, 2.4);
+    });
+    return 0.2126 * ch[0] + 0.7152 * ch[1] + 0.0722 * ch[2];
+  };
+  const contrast = (a, b) => {
+    const [hi, lo] = [lum(a), lum(b)].sort((x, y) => y - x);
+    return (hi + 0.05) / (lo + 0.05);
+  };
+
+  for (const [name, selector, minMuted] of [['dark', ':root', 4.5], ['light', 'html[data-theme="light"]', 4.5]]) {
+    const t = tokensOf(selector);
+    const bg = rgb(t.bg);
+    const surface = rgb(t.surface);
+    assert.ok(bg && surface, `${name}: bg and surface are solid colours`);
+    assert.ok(contrast(rgb(t.text), bg) >= 7, `${name}: --text must be AAA on --bg`);
+    assert.ok(contrast(rgb(t['text-2']), bg) >= 4.5, `${name}: --text-2 must be readable on --bg`);
+    assert.ok(contrast(rgb(t['text-3']), bg) >= minMuted, `${name}: --text-3 (muted labels) must be readable on --bg`);
+    assert.ok(contrast(rgb(t['text-3']), surface) >= minMuted, `${name}: --text-3 must be readable on --surface`);
+  }
+});
+
+test('theme-dependent bars use tokens, not hardcoded dark', async () => {
+  const html = fs.readFileSync('docs/index.html', 'utf8');
+  assert.match(html, /linear-gradient\(180deg, var\(--bar-top\)/, 'the top bar follows the theme');
+  assert.match(html, /background:\s*var\(--chip-bg\)/, 'the floating chip follows the theme');
+  assert.match(html, /background:\s*var\(--overlay\)/, 'modal/sheet backdrops follow the theme');
+});
+
 test('hidden overlays are really hidden (an always-on backdrop ate every tap)', async () => {
   const html = fs.readFileSync('docs/index.html', 'utf8');
   assert.match(html, /\[hidden\]\s*\{\s*display:\s*none\s*!important/, 'the [hidden] rule ships');

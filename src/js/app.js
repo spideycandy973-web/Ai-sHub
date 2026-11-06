@@ -34,7 +34,7 @@
   const media = (query) => (typeof window.matchMedia === 'function' ? window.matchMedia(query) : { matches: false, addEventListener() {}, addListener() {} });
 
   function applyTheme() {
-    const pref = A.settings.get('theme');
+    const pref = A.settings.get('theme') || 'system';
     const dark = pref === 'dark' || (pref === 'system' && media('(prefers-color-scheme: dark)').matches);
     document.documentElement.setAttribute('data-theme', dark ? 'dark' : 'light');
     const meta = document.querySelector('meta[name="theme-color"]');

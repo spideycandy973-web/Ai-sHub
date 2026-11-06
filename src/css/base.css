@@ -8,9 +8,15 @@
   --surface-3: #212133;
   --line: #262638;
   --line-soft: #1d1d2c;
-  --text: #f2f3f8;
-  --text-2: #a9adc0;
-  --text-3: #6d7188;
+  --text: #f4f5fa;
+  --text-2: #c2c6d8;
+  --text-3: #9aa0b8;
+  /* surfaces that used to be hardcoded dark: they must follow the theme, or the
+     light theme paints near-black text on a dark bar and the app looks blank */
+  --bar-top: rgba(7, 7, 11, 0.94);
+  --bar-fade: rgba(7, 7, 11, 0.6);
+  --chip-bg: rgba(18, 18, 31, 0.9);
+  --overlay: rgba(4, 4, 10, 0.66);
   --brand: #7c5cff;
   --brand-2: #22d3ee;
   --brand-3: #ff7ab6;
@@ -39,9 +45,13 @@ html[data-theme="light"] {
   --surface-3: #e8e8f2;
   --line: #e2e2ee;
   --line-soft: #ededf5;
-  --text: #14141f;
-  --text-2: #555873;
-  --text-3: #8a8da3;
+  --text: #0e0e18;
+  --text-2: #3f4260;
+  --text-3: #63667f;
+  --bar-top: rgba(255, 255, 255, 0.96);
+  --bar-fade: rgba(255, 255, 255, 0.66);
+  --chip-bg: rgba(255, 255, 255, 0.92);
+  --overlay: rgba(14, 14, 34, 0.42);
   --shadow: 0 12px 34px -20px rgba(20, 20, 60, 0.45);
 }
 
@@ -235,7 +245,7 @@ textarea.input { height: auto; min-height: 84px; padding: 11px 13px; resize: ver
 
 /* ═════════════ modal ═════════════ */
 .modal-backdrop, .sheet-backdrop, .drawer-backdrop {
-  position: fixed; inset: 0; background: rgba(4, 4, 10, 0.62);
+  position: fixed; inset: 0; background: var(--overlay);
   backdrop-filter: blur(3px); -webkit-backdrop-filter: blur(3px); z-index: 60;
   animation: fade-in 0.2s var(--ease);
 }
