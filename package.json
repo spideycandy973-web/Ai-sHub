@@ -1,6 +1,6 @@
 {
   "name": "aishub",
-  "version": "1.0.4",
+  "version": "1.0.5",
   "private": true,
   "description": "Ai'sHub - offline-first AI assistant + agent with 100+ models and auto model discovery",
   "scripts": {

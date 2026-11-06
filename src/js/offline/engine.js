@@ -165,9 +165,9 @@
     ['random', /(roll|dice|coin flip|flip a coin|random number|pick a number|password|generate.*(password|uuid))/i],
     ['wordcount', /(word count|count words|how many words|character count|letter count)/i],
     ['casemorph', /(uppercase|lowercase|capitalize|title case|reverse (the )?(text|string)|slugify)/i],
-    ['code', /(code|function|script|program|class|bug|error|exception|javascript|typescript|python|java\b|kotlin|swift|c\+\+|html|css|sql|regex|api|algorithm|react|node|git|bash|docker|syntax|compile)/i],
-    ['write', /(write|draft|compose|email|letter|essay|article|blog|post|caption|story|poem|resume|cv|cover letter|speech|script|summary|summarize)/i],
-    ['plan', /(plan|itinerary|schedule|roadmap|checklist|routine|budget|workout|study plan|trip)/i],
+    ['code', /\b(code|coding|function|script|program|programming|class|bug|debug|error|exception|javascript|typescript|python|java|kotlin|swift|c\+\+|html|css|sql|regex|api|algorithm|react|node|git|bash|docker|syntax|compile)\b/i],
+    ['write', /\b(write|draft|compose|email|letter|essay|article|blog|post|caption|story|poem|resume|cv|cover letter|speech|script|summary|summarize)\b/i],
+    ['plan', /\b(plan|planner|itinerary|schedule|roadmap|checklist|routine|budget|workout|study plan|trip)\b/i],
     ['translate', /(translate|in (bengali|bangla|hindi|arabic|spanish|french|german|urdu|chinese|japanese)|how do you say)/i],
     ['brainstorm', /(brainstorm|ideas|name ideas|suggest|give me \d+|list of|examples of)/i],
     ['decide', /(should i|pros and cons|decide|choose between|which is better|compare)/i],
@@ -192,6 +192,13 @@
   function extractExpression(text) {
     let t = ' ' + text.toLowerCase() + ' ';
     for (const [re, rep] of MATH_WORDS) t = t.replace(re, rep);
+    // "square root of 144" → sqrt(144). Without this the words were stripped and
+    // the bare number was returned as the "answer" (square root of 144 → 144).
+    t = t.replace(/(?:the\s+)?square\s+root\s+of\s+(-?[\d.]+)/g, ' sqrt($1) ');
+    t = t.replace(/(?:the\s+)?cube\s+root\s+of\s+(-?[\d.]+)/g, ' cbrt($1) ');
+    t = t.replace(/(-?[\d.]+)\s+squared/g, ' $1^2 ');
+    t = t.replace(/(-?[\d.]+)\s+cubed/g, ' $1^3 ');
+    t = t.replace(/\broot\s+of\s+(-?[\d.]+)/g, ' sqrt($1) ');
     // "15% of 240" → (15/100*240)
     t = t.replace(/(\d+(?:\.\d+)?)\s*%\s*of\s*(\d+(?:\.\d+)?)/g, '($1/100*$2)');
     // strip polite framing
@@ -373,6 +380,23 @@ if (r.ok) console.log(r.value * 2);
   function codeAnswer(text) {
     const lang = extractCodeLanguage(text);
     const isDebug = /(bug|error|exception|not working|fix|crash|fail)/i.test(text);
+
+    // "how do I learn javascript" is a learning question, not a request for a file
+    const isLearning = /\b(learn|learning|beginner|from scratch|how do i start|where do i start|tutorial|roadmap|get better|practice)\b/i.test(text)
+      && !/\b(write|create|make|build|fix|debug|error|example|snippet)\b/i.test(text);
+    if (isLearning) {
+      return `## Learning ${lang}
+
+${numbered([
+  '**One language, one month.** Pick the language you actually need and ignore the rest; syntax is the easy part.',
+  '**Build something tiny every day** — a counter, a todo list, a calculator. 20 minutes beats a 3-hour video.',
+  '**Read errors properly.** The first line names the file and line; that is the bug, not the scary trace below it.',
+  '**Learn debugging early** — console.log the real values, then bisect. This is 80% of the job.',
+  '**Use the language’s own docs** for the core API, and ask me to explain any snippet you do not follow.',
+])}
+
+Paste your code or the error text and I will work on the actual problem. My maths, conversion and text tools also run offline, so I keep working without internet.`;
+    }
     const snippet = CODE_SNIPPETS[lang] || CODE_SNIPPETS.javascript;
     if (isDebug) {
       return `## Debugging plan
@@ -448,6 +472,8 @@ Readiness: **offline-ready** · **no account** · **no tracking**.`;
   function mathAnswer(text) {
     const expr = extractExpression(text);
     if (!expr) return null;
+    // "what is 7" is not arithmetic; echoing a lone number as an answer is a lie
+    if (/^-?[\d.]+$/.test(expr) && !/sqrt|cbrt|\^|[*+\-/%!]/.test(text)) return null;
     let value;
     try {
       value = evalMath(expr);
@@ -827,10 +853,47 @@ Tell me the actual options and I'll score them with you.`;
     return `## ${pick(jokes)}\n\nWant another? Ask for a theme — programmer, science, wordplay — or "roast my code".`;
   }
 
+  /* A question about the world that the local library cannot answer. Guessing is
+     worse than saying so: a made-up structure looks like an answer and is wrong. */
+  const FACTUAL = /^(who|whose|whom|when|where|which|what|why|how (many|much|far|tall|long|old|big|deep|high|heavy|wide))\b/i;
+
+  function looksFactual(text) {
+    const t = text.trim();
+    if (!FACTUAL.test(t)) return false;
+    // these are things the local tools genuinely handle
+    if (parseConversion(t)) return false;
+    if (/\d[\d\s.,]*[+\-*/^%]\s*\d|% of |square root|sqrt|cube root/.test(t)) return false;
+    return true;
+  }
+
+  function unknownAnswer(text, hits) {
+    const related = hits.slice(0, 3).map((h) => h.topic.title);
+    return `## I don't know that one offline
+
+I'll be straight with you: **this is not in my on-device knowledge**, and I'd rather say so than invent something that sounds right. Offline I have ${A.knowledge.topics.length} topics plus exact maths, unit conversion and text tools — no live data and no web.
+
+**To get the real answer in seconds**
+${numbered([
+  'With internet on, tap the **model chip** at the top and pick a keyless cloud model — it answers this properly, no signup.',
+  'Or add a free key (Gemini, Groq, OpenRouter) in **Settings → Providers** to unlock 100+ models.',
+  'Still offline? Ask me maths, unit conversions, text tools, or anything from my library — those stay exact.',
+])}${related.length ? `\n\n**Closest things I do know:** ${related.join(' · ')}` : ''}`;
+  }
+
+  /* A hit only counts as an answer when the query actually touched one of the topic's
+     triggers. Body-word overlap alone is how "how does wifi work" was answered with a
+     page about offline mode: related words, wrong topic, wrong answer. */
+  const confidentHits = (hits) => hits.filter((h) => h.score >= 7 && h.triggerHits > 0);
+
   function explainAnswer(text, hits) {
-    if (hits.length && hits[0].score >= 7) {
-      return hits[0].topic.answer;
+    const strong = confidentHits(hits);
+    if (strong.length) {
+      const best = strong[0];
+      const more = strong.slice(1).map((h) => h.topic.title);
+      return best.topic.answer + (more.length ? `\n\n---\n**Also in my offline library:** ${more.join(' · ')}` : '');
     }
+    // No confident match: never dress up a guess as an answer.
+    return unknownAnswer(text, hits);
     const topic = text
       .replace(/^(what is|what are|whats|what's|explain|define|tell me about|how does|how do|why is|why do|meaning of)\s*/i, '')
       .replace(/[?.!]+$/, '')
@@ -896,9 +959,13 @@ Paste the exact text and I'll do what this engine can, or hand off cleanly.`;
   }
 
   function generalAnswer(text, hits) {
-    if (hits.length) {
-      const best = hits[0].topic.answer;
-      const more = hits.slice(1).map((h) => h.topic.title);
+    // Only a confident library match counts. A weak hit is how "population of Dhaka"
+    // used to be answered with an explainer about REST APIs: related vocabulary, wrong answer.
+    const strong = confidentHits(hits);
+    if (!strong.length) return unknownAnswer(text, hits);
+    if (strong.length) {
+      const best = strong[0].topic.answer;
+      const more = strong.slice(1).map((h) => h.topic.title);
       return best + (more.length ? `\n\n---\n**Also in my offline library:** ${more.join(' · ')}` : '');
     }
     const words = A.knowledge.tokens(text);

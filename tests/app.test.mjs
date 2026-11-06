@@ -411,6 +411,37 @@ test('text is readable in both themes (WCAG contrast on the shipped tokens)', as
   }
 });
 
+test('offline answers: exact maths, right topic, or an honest "I don\'t know"', () => {
+  const E = A.offlineEngine;
+  const ask = (q) => E.composeReply({ messages: [{ role: 'user', content: q }] }).replace(/\s+/g, ' ');
+
+  // arithmetic must be right (a bare number used to be echoed as the "answer")
+  assert.match(ask('square root of 144'), /Answer: 12\b/, 'square root of 144 is 12');
+  assert.match(ask('what is the square root of 81'), /Answer: 9\b/, 'square root of 81 is 9');
+  assert.match(ask('what is 2+2'), /Answer: 4\b/);
+  assert.match(ask('what is 15% of 240'), /Answer: 36\b/);
+
+  // library topics still answer properly
+  assert.match(ask('what is photosynthesis'), /Photosynthesis/);
+  assert.match(ask('explain gravity'), /Gravity/);
+  assert.match(ask('what is the water cycle'), /water cycle/i);
+  assert.match(ask('how does offline mode work'), /Offline/);
+
+  // ...and everything outside the library says so instead of inventing something
+  for (const q of ['what is the capital of France', 'who wrote Hamlet', 'when did world war 2 end',
+                   'get me the population of Dhaka', 'who is the president of bangladesh']) {
+    assert.match(ask(q), /I don't know that one offline/i, `${q} must admit what it does not know`);
+  }
+
+  // a generic verb must not steal a topic: "wifi work" is not "offline mode works"
+  assert.match(ask('how does wifi work'), /I don't know that one offline/i, 'wifi was answered with the offline topic');
+  // and "capital" must not be read as the programming keyword "api"
+  assert.doesNotMatch(ask('what is the capital of France'), /Javascript starter|createStore/i);
+  // learning questions get a path, not a code dump
+  assert.match(ask('how do i learn javascript'), /Learning/);
+  assert.doesNotMatch(ask('how do i learn javascript'), /Starter module/);
+});
+
 test('every theme is a complete, readable palette with coloured headings', async () => {
   const html = fs.readFileSync('docs/index.html', 'utf8');
   const tokensOf = (selector) => {

@@ -1047,6 +1047,17 @@ Paste your text and tell me the language, and I'll do what this engine can — o
     return { topic: t, triggerTokens, titleTokens, bodyTokens };
   });
 
+  /* Generic verbs and filler carry no subject. Without this filter the trigger
+     "works offline" matched the verb in "how does wifi WORK" and answered a question
+     about Wi-Fi with a page about offline mode: right words, wrong topic. */
+  const GENERIC = new Set([
+    'work', 'works', 'working', 'use', 'uses', 'using', 'make', 'makes', 'making',
+    'do', 'does', 'did', 'done', 'doing', 'get', 'gets', 'got', 'give', 'want',
+    'need', 'how', 'what', 'why', 'when', 'where', 'which', 'who', 'this', 'that',
+    'app', 'thing', 'things', 'way', 'ways', 'best', 'good', 'right', 'help',
+    'can', 'could', 'should', 'would', 'will', 'really', 'actually', 'please',
+  ]);
+
   /** Score every topic against the query, best first. */
   function search(query, limit = 3) {
     const q = tokens(query).map(stem);
@@ -1054,17 +1065,19 @@ Paste your text and tell me the language, and I'll do what this engine can — o
     const lowerQuery = ' ' + query.toLowerCase() + ' ';
     const scored = index.map(({ topic, triggerTokens, titleTokens, bodyTokens }) => {
       let score = 0;
+      let triggerHits = 0;
       for (const word of q) {
-        if (triggerTokens.has(word)) score += 5;
-        else if ([...triggerTokens].some((tr) => tr.startsWith(word) && word.length > 3)) score += 3;
-        if (titleTokens.has(word)) score += 3;
+        const meaningful = !GENERIC.has(word) && word.length > 2;
+        if (meaningful && triggerTokens.has(word)) { score += 5; triggerHits += 1; }
+        else if (meaningful && [...triggerTokens].some((tr) => tr.startsWith(word) && word.length > 3)) { score += 3; triggerHits += 1; }
+        if (meaningful && titleTokens.has(word)) score += 3;
         if (bodyTokens.has(word)) score += 0.6;
       }
       for (const trig of topic.triggers) {
-        if (trig.includes(' ') && lowerQuery.includes(trig)) score += 7;
+        if (trig.includes(' ') && lowerQuery.includes(trig)) { score += 7; triggerHits += 2; }
       }
       // normalise a touch so huge topics don't dominate
-      return { topic, score: score / Math.sqrt(1 + topic.answer.length / 3000) };
+      return { topic, score: score / Math.sqrt(1 + topic.answer.length / 3000), triggerHits };
     });
     return scored
       .filter((s) => s.score >= 3.5)

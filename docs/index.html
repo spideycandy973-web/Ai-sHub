@@ -16,7 +16,7 @@
 <meta property="og:title" content="Ai'sHub — your free AI agent" />
 <meta property="og:description" content="Chat + agent mode, 100+ models, auto-added new models, offline engine. Free forever." />
 <meta property="og:image" content="icon-512.png" />
-<meta name="build" content="2026-11-06 / 9ecfc688f381" />
+<meta name="build" content="2026-11-06 / dd1b9535d801" />
 <style>
 <style>
 /* ═════════════ Ai'sHub design tokens ═════════════ */
@@ -1202,7 +1202,7 @@ input[type="range"]::-webkit-slider-thumb {
         <img src="logo.png" alt="" width="34" height="34" class="logo-img" />
         <div>
           <strong>Ai'sHub</strong>
-          <small id="drawer-version">v1.0.4</small>
+          <small id="drawer-version">v1.0.5</small>
         </div>
       </div>
       <button class="icon-btn" id="drawer-close" aria-label="Close"><svg viewBox="0 0 24 24"><path d="m6 6 12 12M18 6 6 18" /></svg></button>
@@ -1259,7 +1259,7 @@ var __async = (__this, __arguments, generator) => {
 (function() {
   "use strict";
   const A = window.A = window.A || {};
-  A.VERSION = "1.0.4";
+  A.VERSION = "1.0.5";
   A.BUILD = "2026-11-06";
   const uid = (prefix = "") => prefix + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
   const clamp = (n, min, max) => Math.max(min, Math.min(max, n));
@@ -4317,22 +4317,80 @@ Paste your text and tell me the language, and I'll do what this engine can — o
     const bodyTokens = new Set(tokens(t.answer).map(stem));
     return { topic: t, triggerTokens, titleTokens, bodyTokens };
   });
+  const GENERIC = /* @__PURE__ */ new Set([
+    "work",
+    "works",
+    "working",
+    "use",
+    "uses",
+    "using",
+    "make",
+    "makes",
+    "making",
+    "do",
+    "does",
+    "did",
+    "done",
+    "doing",
+    "get",
+    "gets",
+    "got",
+    "give",
+    "want",
+    "need",
+    "how",
+    "what",
+    "why",
+    "when",
+    "where",
+    "which",
+    "who",
+    "this",
+    "that",
+    "app",
+    "thing",
+    "things",
+    "way",
+    "ways",
+    "best",
+    "good",
+    "right",
+    "help",
+    "can",
+    "could",
+    "should",
+    "would",
+    "will",
+    "really",
+    "actually",
+    "please"
+  ]);
   function search(query, limit = 3) {
     const q = tokens(query).map(stem);
     if (!q.length) return [];
     const lowerQuery = " " + query.toLowerCase() + " ";
     const scored = index.map(({ topic, triggerTokens, titleTokens, bodyTokens }) => {
       let score = 0;
+      let triggerHits = 0;
       for (const word of q) {
-        if (triggerTokens.has(word)) score += 5;
-        else if ([...triggerTokens].some((tr) => tr.startsWith(word) && word.length > 3)) score += 3;
-        if (titleTokens.has(word)) score += 3;
+        const meaningful = !GENERIC.has(word) && word.length > 2;
+        if (meaningful && triggerTokens.has(word)) {
+          score += 5;
+          triggerHits += 1;
+        } else if (meaningful && [...triggerTokens].some((tr) => tr.startsWith(word) && word.length > 3)) {
+          score += 3;
+          triggerHits += 1;
+        }
+        if (meaningful && titleTokens.has(word)) score += 3;
         if (bodyTokens.has(word)) score += 0.6;
       }
       for (const trig of topic.triggers) {
-        if (trig.includes(" ") && lowerQuery.includes(trig)) score += 7;
+        if (trig.includes(" ") && lowerQuery.includes(trig)) {
+          score += 7;
+          triggerHits += 2;
+        }
       }
-      return { topic, score: score / Math.sqrt(1 + topic.answer.length / 3e3) };
+      return { topic, score: score / Math.sqrt(1 + topic.answer.length / 3e3), triggerHits };
     });
     return scored.filter((s) => s.score >= 3.5).sort((a, b) => b.score - a.score).slice(0, limit);
   }
@@ -4546,9 +4604,9 @@ var __async = (__this, __arguments, generator) => {
     ["random", /(roll|dice|coin flip|flip a coin|random number|pick a number|password|generate.*(password|uuid))/i],
     ["wordcount", /(word count|count words|how many words|character count|letter count)/i],
     ["casemorph", /(uppercase|lowercase|capitalize|title case|reverse (the )?(text|string)|slugify)/i],
-    ["code", /(code|function|script|program|class|bug|error|exception|javascript|typescript|python|java\b|kotlin|swift|c\+\+|html|css|sql|regex|api|algorithm|react|node|git|bash|docker|syntax|compile)/i],
-    ["write", /(write|draft|compose|email|letter|essay|article|blog|post|caption|story|poem|resume|cv|cover letter|speech|script|summary|summarize)/i],
-    ["plan", /(plan|itinerary|schedule|roadmap|checklist|routine|budget|workout|study plan|trip)/i],
+    ["code", /\b(code|coding|function|script|program|programming|class|bug|debug|error|exception|javascript|typescript|python|java|kotlin|swift|c\+\+|html|css|sql|regex|api|algorithm|react|node|git|bash|docker|syntax|compile)\b/i],
+    ["write", /\b(write|draft|compose|email|letter|essay|article|blog|post|caption|story|poem|resume|cv|cover letter|speech|script|summary|summarize)\b/i],
+    ["plan", /\b(plan|planner|itinerary|schedule|roadmap|checklist|routine|budget|workout|study plan|trip)\b/i],
     ["translate", /(translate|in (bengali|bangla|hindi|arabic|spanish|french|german|urdu|chinese|japanese)|how do you say)/i],
     ["brainstorm", /(brainstorm|ideas|name ideas|suggest|give me \d+|list of|examples of)/i],
     ["decide", /(should i|pros and cons|decide|choose between|which is better|compare)/i],
@@ -4568,6 +4626,11 @@ var __async = (__this, __arguments, generator) => {
   function extractExpression(text) {
     let t = " " + text.toLowerCase() + " ";
     for (const [re, rep] of MATH_WORDS) t = t.replace(re, rep);
+    t = t.replace(/(?:the\s+)?square\s+root\s+of\s+(-?[\d.]+)/g, " sqrt($1) ");
+    t = t.replace(/(?:the\s+)?cube\s+root\s+of\s+(-?[\d.]+)/g, " cbrt($1) ");
+    t = t.replace(/(-?[\d.]+)\s+squared/g, " $1^2 ");
+    t = t.replace(/(-?[\d.]+)\s+cubed/g, " $1^3 ");
+    t = t.replace(/\broot\s+of\s+(-?[\d.]+)/g, " sqrt($1) ");
     t = t.replace(/(\d+(?:\.\d+)?)\s*%\s*of\s*(\d+(?:\.\d+)?)/g, "($1/100*$2)");
     t = t.replace(/\b(what is|what's|whats|calculate|compute|evaluate|solve|please|the value of|how much is|equals?|answer|result|tell me|find|get)\b/g, " ");
     t = t.replace(/(\d),(\d{3})/g, "$1$2");
@@ -4737,6 +4800,20 @@ if (r.ok) console.log(r.value * 2);
   function codeAnswer(text) {
     const lang = extractCodeLanguage(text);
     const isDebug = /(bug|error|exception|not working|fix|crash|fail)/i.test(text);
+    const isLearning = /\b(learn|learning|beginner|from scratch|how do i start|where do i start|tutorial|roadmap|get better|practice)\b/i.test(text) && !/\b(write|create|make|build|fix|debug|error|example|snippet)\b/i.test(text);
+    if (isLearning) {
+      return `## Learning ${lang}
+
+${numbered([
+        "**One language, one month.** Pick the language you actually need and ignore the rest; syntax is the easy part.",
+        "**Build something tiny every day** — a counter, a todo list, a calculator. 20 minutes beats a 3-hour video.",
+        "**Read errors properly.** The first line names the file and line; that is the bug, not the scary trace below it.",
+        "**Learn debugging early** — console.log the real values, then bisect. This is 80% of the job.",
+        "**Use the language’s own docs** for the core API, and ask me to explain any snippet you do not follow."
+      ])}
+
+Paste your code or the error text and I will work on the actual problem. My maths, conversion and text tools also run offline, so I keep working without internet.`;
+    }
     const snippet = CODE_SNIPPETS[lang] || CODE_SNIPPETS.javascript;
     if (isDebug) {
       return `## Debugging plan
@@ -4809,6 +4886,7 @@ Readiness: **offline-ready** · **no account** · **no tracking**.`;
   function mathAnswer(text) {
     const expr = extractExpression(text);
     if (!expr) return null;
+    if (/^-?[\d.]+$/.test(expr) && !/sqrt|cbrt|\^|[*+\-/%!]/.test(text)) return null;
     let value;
     try {
       value = evalMath(expr);
@@ -5206,10 +5284,41 @@ Tell me the actual options and I'll score them with you.`;
 
 Want another? Ask for a theme — programmer, science, wordplay — or "roast my code".`;
   }
+  const FACTUAL = /^(who|whose|whom|when|where|which|what|why|how (many|much|far|tall|long|old|big|deep|high|heavy|wide))\b/i;
+  function looksFactual(text) {
+    const t = text.trim();
+    if (!FACTUAL.test(t)) return false;
+    if (parseConversion(t)) return false;
+    if (/\d[\d\s.,]*[+\-*/^%]\s*\d|% of |square root|sqrt|cube root/.test(t)) return false;
+    return true;
+  }
+  function unknownAnswer(text, hits) {
+    const related = hits.slice(0, 3).map((h) => h.topic.title);
+    return `## I don't know that one offline
+
+I'll be straight with you: **this is not in my on-device knowledge**, and I'd rather say so than invent something that sounds right. Offline I have ${A.knowledge.topics.length} topics plus exact maths, unit conversion and text tools — no live data and no web.
+
+**To get the real answer in seconds**
+${numbered([
+      "With internet on, tap the **model chip** at the top and pick a keyless cloud model — it answers this properly, no signup.",
+      "Or add a free key (Gemini, Groq, OpenRouter) in **Settings → Providers** to unlock 100+ models.",
+      "Still offline? Ask me maths, unit conversions, text tools, or anything from my library — those stay exact."
+    ])}${related.length ? `
+
+**Closest things I do know:** ${related.join(" · ")}` : ""}`;
+  }
+  const confidentHits = (hits) => hits.filter((h) => h.score >= 7 && h.triggerHits > 0);
   function explainAnswer(text, hits) {
-    if (hits.length && hits[0].score >= 7) {
-      return hits[0].topic.answer;
+    const strong = confidentHits(hits);
+    if (strong.length) {
+      const best = strong[0];
+      const more = strong.slice(1).map((h) => h.topic.title);
+      return best.topic.answer + (more.length ? `
+
+---
+**Also in my offline library:** ${more.join(" · ")}` : "");
     }
+    return unknownAnswer(text, hits);
     const topic = text.replace(/^(what is|what are|whats|what's|explain|define|tell me about|how does|how do|why is|why do|meaning of)\s*/i, "").replace(/[?.!]+$/, "").trim();
     if (!topic) return null;
     const related = hits.map((h) => h.topic.title).slice(0, 3);
@@ -5278,9 +5387,11 @@ Translate to ${target ? langMap[target] : "<language>"}, keep names unchanged, f
 Paste the exact text and I'll do what this engine can, or hand off cleanly.`;
   }
   function generalAnswer(text, hits) {
-    if (hits.length) {
-      const best = hits[0].topic.answer;
-      const more = hits.slice(1).map((h) => h.topic.title);
+    const strong = confidentHits(hits);
+    if (!strong.length) return unknownAnswer(text, hits);
+    if (strong.length) {
+      const best = strong[0].topic.answer;
+      const more = strong.slice(1).map((h) => h.topic.title);
       return best + (more.length ? `
 
 ---
