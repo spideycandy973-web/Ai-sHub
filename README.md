@@ -121,7 +121,12 @@ cd android
 ```
 
 Or open the `android/` folder in Android Studio and press Run. Requirements: JDK 17+ and the
-Android SDK (API 36). The web app is bundled inside the APK, so the installed app is offline-first
+Android SDK (API 36). **The app needs Android 7.0 or newer** (`minSdk 24`): the Capacitor 8
+stack refuses anything lower, so an older phone will report "App not installed".
+
+If the app ever fails to start it says so on screen instead of going blank: a plain-ES5 guard
+catches script errors, and a native panel reports the boot stage, the build revision and the
+Android/WebView versions, with Copy and Reload buttons. The web app is bundled inside the APK, so the installed app is offline-first
 with no server and no Play Store dependency.
 
 `npm run android` does the sync and the Gradle build in one step.
