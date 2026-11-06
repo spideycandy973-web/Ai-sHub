@@ -411,6 +411,49 @@ test('text is readable in both themes (WCAG contrast on the shipped tokens)', as
   }
 });
 
+test('with internet, a real cloud model answers before the on-device engine', async () => {
+  const calls = [];
+  const original = A.providerClient.complete;
+  const setOnline = (v) => Object.defineProperty(window.navigator, 'onLine', { configurable: true, get: () => v });
+  setOnline(true);
+  A.settings.set('autoCloud', true);
+  A.providerClient.complete = async ({ provider, modelId }) => {
+    calls.push(`${provider.id}/${modelId}`);
+    return { text: 'Paris is the capital of France.', model: modelId, provider: provider.id };
+  };
+  try {
+    const res = await A.ai.chat({ messages: [{ role: 'user', content: 'what is the capital of France' }] });
+    assert.ok(calls.length >= 1, 'a cloud provider was actually called');
+    assert.equal(res.text, 'Paris is the capital of France.');
+    assert.equal(res.provider, 'pollinations', 'the keyless free provider is preferred');
+    assert.equal(res.autoCloud, true, 'the answer is marked as coming from the cloud');
+  } finally {
+    A.providerClient.complete = original;
+  }
+
+  // when the network is gone, the on-device engine answers and says so
+  setOnline(false);
+  const offline = await A.ai.chat({ messages: [{ role: 'user', content: 'what is 2+2' }] });
+  assert.equal(offline.provider, 'local');
+  assert.match(offline.text, /Answer: 4/);
+});
+
+test('cloud first can be switched off', async () => {
+  const original = A.providerClient.complete;
+  let called = false;
+  Object.defineProperty(window.navigator, 'onLine', { configurable: true, get: () => true });
+  A.settings.set('autoCloud', false);
+  A.providerClient.complete = async () => { called = true; return { text: 'should not happen' }; };
+  try {
+    const res = await A.ai.chat({ messages: [{ role: 'user', content: 'what is 2+2' }] });
+    assert.equal(called, false, 'no network call when the user chose on-device only');
+    assert.equal(res.provider, 'local');
+  } finally {
+    A.providerClient.complete = original;
+    A.settings.set('autoCloud', true);
+  }
+});
+
 test('offline answers: exact maths, right topic, or an honest "I don\'t know"', () => {
   const E = A.offlineEngine;
   const ask = (q) => E.composeReply({ messages: [{ role: 'user', content: q }] }).replace(/\s+/g, ' ');

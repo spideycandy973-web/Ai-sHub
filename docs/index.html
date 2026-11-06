@@ -16,7 +16,7 @@
 <meta property="og:title" content="Ai'sHub — your free AI agent" />
 <meta property="og:description" content="Chat + agent mode, 100+ models, auto-added new models, offline engine. Free forever." />
 <meta property="og:image" content="icon-512.png" />
-<meta name="build" content="2026-11-06 / dd1b9535d801" />
+<meta name="build" content="2026-11-06 / 65abb0f80dc5" />
 <style>
 <style>
 /* ═════════════ Ai'sHub design tokens ═════════════ */
@@ -1202,7 +1202,7 @@ input[type="range"]::-webkit-slider-thumb {
         <img src="logo.png" alt="" width="34" height="34" class="logo-img" />
         <div>
           <strong>Ai'sHub</strong>
-          <small id="drawer-version">v1.0.5</small>
+          <small id="drawer-version">v1.0.6</small>
         </div>
       </div>
       <button class="icon-btn" id="drawer-close" aria-label="Close"><svg viewBox="0 0 24 24"><path d="m6 6 12 12M18 6 6 18" /></svg></button>
@@ -1259,7 +1259,7 @@ var __async = (__this, __arguments, generator) => {
 (function() {
   "use strict";
   const A = window.A = window.A || {};
-  A.VERSION = "1.0.5";
+  A.VERSION = "1.0.6";
   A.BUILD = "2026-11-06";
   const uid = (prefix = "") => prefix + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
   const clamp = (n, min, max) => Math.max(min, Math.min(max, n));
@@ -6193,11 +6193,45 @@ var __async = (__this, __arguments, generator) => {
     }
     return ladder;
   }
+  function cloudLadder(exclude) {
+    const all = A.catalog.all().filter((m) => !isLocal(m) && readiness(m).ready);
+    const rank = (m) => m.provider === "pollinations" ? 0 : m.free ? 1 : 2;
+    return all.filter((m) => !exclude || A.catalog.keyFor(m) !== A.catalog.keyFor(exclude)).sort((a, b) => rank(a) - rank(b)).slice(0, 4);
+  }
+  function wantsCloud() {
+    if (!A.net.online) return false;
+    return A.settings.get("autoCloud") !== false;
+  }
   function chat(_0) {
     return __async(this, arguments, function* ({ messages, model, system, onDelta, signal, noFallback = false, onFallback, temperature, maxTokens }) {
       const target = model || resolveSelected();
       const sys = system !== void 0 ? system : buildSystemPrompt();
       if (isLocal(target)) {
+        if (wantsCloud() && !noFallback) {
+          for (const alt of cloudLadder(null)) {
+            if (signal == null ? void 0 : signal.aborted) break;
+            try {
+              onFallback == null ? void 0 : onFallback({ from: target, to: alt, reason: "Using a cloud model" });
+              const altProvider = A.catalog.providerById(alt.provider);
+              const res2 = yield A.providerClient.complete({
+                provider: altProvider,
+                modelId: alt.id,
+                messages,
+                system: sys,
+                signal,
+                onDelta,
+                temperature,
+                maxTokens
+              });
+              if (res2.text && res2.text.trim()) {
+                return __spreadProps(__spreadValues({}, res2), { model: alt.id, provider: alt.provider, usedFallback: true, autoCloud: true, fallbackFrom: target });
+              }
+            } catch (e) {
+              if (signal == null ? void 0 : signal.aborted) return Promise.reject(e);
+              continue;
+            }
+          }
+        }
         const res = yield A.offlineEngine.chat({ messages, model: (target == null ? void 0 : target.id) || "aishub-core-1", onDelta, signal });
         return __spreadProps(__spreadValues({}, res), { model: (target == null ? void 0 : target.id) || "aishub-core-1", provider: "local", usedFallback: false });
       }
@@ -8960,6 +8994,17 @@ var __async = (__this, __arguments, generator) => {
         value: s.get("maxTokens"),
         format: (v) => String(v),
         onChange: (v) => s.set("maxTokens", v, { silent: true })
+      })
+    );
+    tempHost.querySelector("#temp-card").appendChild(
+      A.ui.switchRow({
+        label: "Cloud model when online",
+        sub: "A real model answers first; the on-device engine takes over if the network fails.",
+        checked: s.get("autoCloud") !== false,
+        onChange: (v) => {
+          s.set("autoCloud", v, { silent: true });
+          toast(v ? "Cloud model first" : "On-device engine only", "ok", 1600);
+        }
       })
     );
     const stepsHost = host.querySelector("#steps-host");

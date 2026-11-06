@@ -220,6 +220,19 @@
       })
     );
 
+    /* ── brain: cloud first or on-device only ── */
+    tempHost.querySelector('#temp-card').appendChild(
+      A.ui.switchRow({
+        label: 'Cloud model when online',
+        sub: 'A real model answers first; the on-device engine takes over if the network fails.',
+        checked: s.get('autoCloud') !== false,
+        onChange: (v) => {
+          s.set('autoCloud', v, { silent: true });
+          toast(v ? 'Cloud model first' : 'On-device engine only', 'ok', 1600);
+        },
+      })
+    );
+
     /* ── agent steps ── */
     const stepsHost = host.querySelector('#steps-host');
     stepsHost.className = 'setting-group';
