@@ -349,32 +349,91 @@
   }
 
   /* ─────────────── start ─────────────── */
+  /* ── boot resilience ────────────────────────────────────────────────
+     The shell must ALWAYS appear. Every stage is isolated, the splash is hidden
+     on a deadline, and a watchdog declares the app ready: previously one
+     hanging mount() or a stalled IndexedDB read kept the splash up forever and
+     left a blank screen with no explanation. */
+  const bootErrors = [];
+  window.AIHUB_BOOT_LOG = bootErrors;
+
+  function note(name, err) {
+    const msg = `${name}: ${(err && err.message) || err}`;
+    bootErrors.push(msg);
+    console.error('[boot]', msg);
+  }
+  function stage(name, fn) {
+    window.AIHUB_STAGE = name;
+    try {
+      return fn();
+    } catch (err) {
+      note(name, err);
+      return undefined;
+    }
+  }
+  async function stageAsync(name, fn) {
+    window.AIHUB_STAGE = name;
+    try {
+      return await fn();
+    } catch (err) {
+      note(name, err);
+      return undefined;
+    }
+  }
+  function hideSplash() {
+    const splash = document.getElementById('splash');
+    if (!splash) return;
+    splash.classList.add('is-gone');
+    setTimeout(() => {
+      if (splash.parentNode) splash.parentNode.removeChild(splash);
+    }, 700);
+  }
+
+  let bootWatchdog = null;
+
   async function start() {
-    applyTheme();
-    A.i18n.init();
-    A.chat.cache();
-    wire();
-    A.screens.models.mount();
-    A.screens.agent.mount();
-    A.screens.prompts.mount();
-    A.screens.settings.mount();
+    // Hide the shell even if a stage hangs: a splash that never leaves is
+    // indistinguishable from a frozen app.
+    const splashDeadline = setTimeout(() => {
+      hideSplash();
+      if (!window.AIHUB_BOOTED) window.AIHUB_STAGE = `${window.AIHUB_STAGE || 'start'} (slow)`;
+    }, 2200);
 
-    // restore last chat
-    const lastId = A.settings.get('lastChatId');
-    if (lastId && A.chatStore.get(lastId)) await A.chat.openChat(lastId);
-    else await A.chat.newChat({ silent: true });
+    // Last resort: if the app has not finished by now, show what we have.
+    bootWatchdog = setTimeout(() => {
+      hideSplash();
+      stage('watchdog-render', () => go('chat'));
+      if (!window.AIHUB_BOOTED && document.querySelector('.composer-wrap')) {
+        window.AIHUB_BOOTED = true;
+        document.documentElement.setAttribute('data-boot', 'ready');
+      }
+    }, 6000);
 
-    go('chat');
-    updateModelChip();
-    updateNetLabel();
-    initReminders();
-    registerSW();
-    stampBuild();
+    stage('theme', applyTheme);
+    stage('i18n', () => A.i18n.init());
+    stage('chat-cache', () => A.chat.cache());
+    stage('wire', wire);
+    stage('mount-models', () => A.screens.models.mount());
+    stage('mount-agent', () => A.screens.agent.mount());
+    stage('mount-prompts', () => A.screens.prompts.mount());
+    stage('mount-settings', () => A.screens.settings.mount());
 
-    // splash out
-    const splash = $('#splash');
-    setTimeout(() => splash.classList.add('is-gone'), 260);
-    setTimeout(() => splash.remove(), 900);
+    // restore last chat — never fatal, a broken store must not hide the app
+    await stageAsync('restore-chat', async () => {
+      const lastId = A.settings.get('lastChatId');
+      if (lastId && A.chatStore.get(lastId)) await A.chat.openChat(lastId);
+      else await A.chat.newChat({ silent: true });
+    });
+
+    stage('home', () => go('chat'));
+    stage('chip', () => updateModelChip());
+    stage('net', () => updateNetLabel());
+    stage('reminders', () => initReminders());
+    stage('service-worker', () => registerSW());
+    stage('stamp', () => stampBuild());
+
+    clearTimeout(splashDeadline);
+    hideSplash();
 
     // first-run + auto sync
     setTimeout(() => firstRun(), 700);
@@ -430,6 +489,8 @@
       if (!document.hidden && A.discovery.shouldAutoSync()) A.discovery.syncAll({}).catch(() => {});
     });
     // Boot finished: the guard in index.html stops watching for a blank screen.
+    if (bootWatchdog) clearTimeout(bootWatchdog);
+    if (bootErrors.length) console.warn('[boot] finished with problems:', bootErrors.join(' | '));
     window.AIHUB_BOOTED = true;
     document.documentElement.setAttribute('data-boot', 'ready');
   }

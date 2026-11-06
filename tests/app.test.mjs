@@ -372,6 +372,28 @@ test('time and duration parsing handles am/pm, noon and words', () => {
   assert.equal(P.parseDuration('timer for 2 hours'), 7200);
 });
 
+test('the app still boots when IndexedDB is unavailable (no blank screen)', async () => {
+  // A device where storage is blocked used to leave the HTML splash on screen forever.
+  const dom = await JSDOM.fromFile('docs/index.html', {
+    runScripts: 'dangerously',
+    pretendToBeVisual: true,
+    url: 'https://localhost/',
+    beforeParse(window) {
+      try {
+        Object.defineProperty(window, 'indexedDB', { configurable: true, get: () => undefined });
+      } catch (e) { /* older jsdom has no indexedDB anyway */ }
+    },
+  });
+  const w = dom.window;
+  await new Promise((r) => setTimeout(r, 2500));
+  assert.equal(w.AIHUB_BOOTED, true, 'boot reaches ready even without storage');
+  assert.equal(w.document.documentElement.getAttribute('data-boot'), 'ready');
+  const splash = w.document.getElementById('splash');
+  assert.ok(!splash || splash.classList.contains('is-gone'), 'the splash must not stay on screen');
+  assert.ok(Array.isArray(w.AIHUB_BOOT_LOG), 'boot problems are recorded for the diagnostics panel');
+  w.close();
+});
+
 test('the shipped bundle parses on an older Android WebView (no ES2020 operators)', async () => {
   const html = fs.readFileSync('docs/index.html', 'utf8');
   const blocks = [...html.matchAll(/<script>([\s\S]*?)<\/script>/g)].map((m) => m[1]);
@@ -400,6 +422,8 @@ test('a boot failure is shown on screen instead of a white page', async () => {
   await new Promise((r) => setTimeout(r, 600));
   assert.equal(typeof dom.window.AIHUB_BOOT_ERROR, 'function', 'the guard exposes a reporter');
   assert.equal(dom.window.document.documentElement.getAttribute('data-boot'), 'ready', 'a healthy boot marks the document ready');
+  const splash = dom.window.document.getElementById('splash');
+  assert.ok(!splash || splash.classList.contains('is-gone'), 'the splash is dismissed after boot');
   dom.window.close();
 });
 

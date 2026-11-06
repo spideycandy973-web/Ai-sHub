@@ -16,7 +16,7 @@
 <meta property="og:title" content="Ai'sHub — your free AI agent" />
 <meta property="og:description" content="Chat + agent mode, 100+ models, auto-added new models, offline engine. Free forever." />
 <meta property="og:image" content="icon-512.png" />
-<meta name="build" content="2026-11-06 / ffaa85151d28" />
+<meta name="build" content="2026-11-06 / 4db30d353a38" />
 <style>
 <style>
 /* ═════════════ Ai'sHub design tokens ═════════════ */
@@ -9355,28 +9355,77 @@ var __async = (__this, __arguments, generator) => {
       }
     });
   }
+  const bootErrors = [];
+  window.AIHUB_BOOT_LOG = bootErrors;
+  function note(name, err) {
+    const msg = `${name}: ${err && err.message || err}`;
+    bootErrors.push(msg);
+    console.error("[boot]", msg);
+  }
+  function stage(name, fn) {
+    window.AIHUB_STAGE = name;
+    try {
+      return fn();
+    } catch (err) {
+      note(name, err);
+      return void 0;
+    }
+  }
+  function stageAsync(name, fn) {
+    return __async(this, null, function* () {
+      window.AIHUB_STAGE = name;
+      try {
+        return yield fn();
+      } catch (err) {
+        note(name, err);
+        return void 0;
+      }
+    });
+  }
+  function hideSplash() {
+    const splash = document.getElementById("splash");
+    if (!splash) return;
+    splash.classList.add("is-gone");
+    setTimeout(() => {
+      if (splash.parentNode) splash.parentNode.removeChild(splash);
+    }, 700);
+  }
+  let bootWatchdog = null;
   function start() {
     return __async(this, null, function* () {
-      applyTheme();
-      A.i18n.init();
-      A.chat.cache();
-      wire();
-      A.screens.models.mount();
-      A.screens.agent.mount();
-      A.screens.prompts.mount();
-      A.screens.settings.mount();
-      const lastId = A.settings.get("lastChatId");
-      if (lastId && A.chatStore.get(lastId)) yield A.chat.openChat(lastId);
-      else yield A.chat.newChat({ silent: true });
-      go("chat");
-      updateModelChip();
-      updateNetLabel();
-      initReminders();
-      registerSW();
-      stampBuild();
-      const splash = $("#splash");
-      setTimeout(() => splash.classList.add("is-gone"), 260);
-      setTimeout(() => splash.remove(), 900);
+      const splashDeadline = setTimeout(() => {
+        hideSplash();
+        if (!window.AIHUB_BOOTED) window.AIHUB_STAGE = `${window.AIHUB_STAGE || "start"} (slow)`;
+      }, 2200);
+      bootWatchdog = setTimeout(() => {
+        hideSplash();
+        stage("watchdog-render", () => go("chat"));
+        if (!window.AIHUB_BOOTED && document.querySelector(".composer-wrap")) {
+          window.AIHUB_BOOTED = true;
+          document.documentElement.setAttribute("data-boot", "ready");
+        }
+      }, 6e3);
+      stage("theme", applyTheme);
+      stage("i18n", () => A.i18n.init());
+      stage("chat-cache", () => A.chat.cache());
+      stage("wire", wire);
+      stage("mount-models", () => A.screens.models.mount());
+      stage("mount-agent", () => A.screens.agent.mount());
+      stage("mount-prompts", () => A.screens.prompts.mount());
+      stage("mount-settings", () => A.screens.settings.mount());
+      yield stageAsync("restore-chat", () => __async(null, null, function* () {
+        const lastId = A.settings.get("lastChatId");
+        if (lastId && A.chatStore.get(lastId)) yield A.chat.openChat(lastId);
+        else yield A.chat.newChat({ silent: true });
+      }));
+      stage("home", () => go("chat"));
+      stage("chip", () => updateModelChip());
+      stage("net", () => updateNetLabel());
+      stage("reminders", () => initReminders());
+      stage("service-worker", () => registerSW());
+      stage("stamp", () => stampBuild());
+      clearTimeout(splashDeadline);
+      hideSplash();
       setTimeout(() => firstRun(), 700);
       if (A.discovery.shouldAutoSync()) {
         A.discovery.syncAll({}).then((res) => {
@@ -9426,6 +9475,8 @@ var __async = (__this, __arguments, generator) => {
         if (!document.hidden && A.discovery.shouldAutoSync()) A.discovery.syncAll({}).catch(() => {
         });
       });
+      if (bootWatchdog) clearTimeout(bootWatchdog);
+      if (bootErrors.length) console.warn("[boot] finished with problems:", bootErrors.join(" | "));
       window.AIHUB_BOOTED = true;
       document.documentElement.setAttribute("data-boot", "ready");
     });

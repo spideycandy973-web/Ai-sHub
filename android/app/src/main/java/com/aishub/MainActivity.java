@@ -132,7 +132,9 @@ public class MainActivity extends BridgeActivity {
             + " + '|styles=' + document.querySelectorAll('style').length"
             + " + '|guard=' + (typeof window.AIHUB_BOOT_ERROR === 'function')"
             + " + '|ua=' + navigator.userAgent"
-            + " + '|text=' + String((document.body && document.body.innerText) || '').replace(/\\s+/g,' ').slice(0, 500);"
+            + " + '|stage=' + String(window.AIHUB_STAGE || 'none')"
+            + " + '|bootlog=' + JSON.stringify(window.AIHUB_BOOT_LOG || []).slice(0, 300)"
+            + " + '|text=' + String((document.body && document.body.innerText) || '').replace(/\\s+/g,' ').slice(0, 400);"
             + "}catch(e){return 'js-error=' + e.message;}})()";
 
         try {
