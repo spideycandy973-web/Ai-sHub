@@ -239,6 +239,8 @@ jobs:
 
           PKG=$("$BT/aapt2" dump badging "$APK" | sed -n "s/^package: name='\\([^']*\\)'.*/\\1/p")
           echo "package id: $PKG"
+          echo "=== what this APK demands of the phone ==="
+          "$BT/aapt2" dump badging "$APK" | grep -E "sdkVersion|targetSdkVersion|native-code" || true
           [ "$PKG" = "com.aishub" ] || { echo "::error::package is '$PKG', expected com.aishub"; exit 1; }
 
           "$BT/apksigner" verify "$APK" || { echo "::error::APK signature does not verify"; exit 1; }
