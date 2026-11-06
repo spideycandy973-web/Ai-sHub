@@ -1,8 +1,8 @@
 /* Ai'sHub service worker - offline shell for the PWA build.
  * API calls are never cached; the app's own local engine works with zero network. */
-const CACHE = 'aishub-1.0.3-b85818c7529d';
+const CACHE = 'aishub-1.0.4-9ecfc688f381';
 const SHELL = ["./","./index.html","./manifest.webmanifest","./logo.png","./icon-192.png","./icon-512.png","./icon-maskable-512.png","./favicon.png","./apple-touch-icon.png"];
-const REV = 'b85818c7529d';
+const REV = '9ecfc688f381';
 
 self.addEventListener('install', (event) => {
   event.waitUntil(

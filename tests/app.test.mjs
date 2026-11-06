@@ -411,6 +411,67 @@ test('text is readable in both themes (WCAG contrast on the shipped tokens)', as
   }
 });
 
+test('every theme is a complete, readable palette with coloured headings', async () => {
+  const html = fs.readFileSync('docs/index.html', 'utf8');
+  const tokensOf = (selector) => {
+    const i = html.indexOf(selector);
+    assert.ok(i >= 0, `${selector} block is present`);
+    const block = html.slice(i, html.indexOf('}', i));
+    const out = {};
+    for (const m of block.matchAll(/--([a-z0-9-]+):\s*([^;]+);/g)) out[m[1]] = m[2].trim();
+    return out;
+  };
+  const rgb = (css) => {
+    const m = String(css).match(/#([0-9a-f]{6})/i);
+    return m ? [0, 2, 4].map((i) => parseInt(m[1].slice(i, i + 2), 16)) : null;
+  };
+  const lum = (c) => {
+    const ch = c.map((v) => {
+      const x = v / 255;
+      return x <= 0.03928 ? x / 12.92 : Math.pow((x + 0.055) / 1.055, 2.4);
+    });
+    return 0.2126 * ch[0] + 0.7152 * ch[1] + 0.0722 * ch[2];
+  };
+  const contrast = (a, b) => {
+    const [hi, lo] = [lum(a), lum(b)].sort((x, y) => y - x);
+    return (hi + 0.05) / (lo + 0.05);
+  };
+
+  const required = ['bg', 'surface', 'line', 'text', 'text-2', 'text-3', 'heading', 'accent', 'brand'];
+  const themes = ['html[data-theme="light"]', 'html[data-theme="aurora"]', 'html[data-theme="sunset"]', 'html[data-theme="neon"]'];
+  for (const sel of themes) {
+    const t = tokensOf(sel);
+    for (const key of required) {
+      assert.ok(t[key], `${sel} defines --${key} (otherwise it inherits the wrong palette)`);
+    }
+    const bg = rgb(t.bg);
+    assert.ok(contrast(rgb(t.text), bg) >= 7, `${sel}: body text is AAA on its background`);
+    assert.ok(contrast(rgb(t['text-3']), bg) >= 4.5, `${sel}: mute text is readable`);
+    assert.ok(contrast(rgb(t.heading), bg) >= 4.5, `${sel}: headings are readable`);
+    assert.ok(contrast(rgb(t.accent), bg) >= 3.5, `${sel}: accents are visible`);
+    // the point of the request: headings are not just the body colour
+    assert.notEqual(t.heading.toLowerCase(), t.text.toLowerCase(), `${sel}: headings carry their own colour`);
+  }
+});
+
+test('switching theme actually re-paints the app', async () => {
+  const dom = await JSDOM.fromFile('docs/index.html', { runScripts: 'dangerously', pretendToBeVisual: true, url: 'https://localhost/' });
+  const w = dom.window;
+  await new Promise((r) => setTimeout(r, 700));
+  assert.ok(w.A.app.themes().length >= 4, 'several themes are offered');
+
+  for (const id of ['aurora', 'sunset', 'neon', 'light', 'dark']) {
+    w.A.settings.set('theme', id);
+    w.A.app.applyTheme();
+    assert.equal(w.document.documentElement.getAttribute('data-theme'), id, `${id} is applied`);
+  }
+  // a stale or unknown value must not leave the app unstyled
+  w.A.settings.set('theme', 'nonsense');
+  w.A.app.applyTheme();
+  assert.equal(w.document.documentElement.getAttribute('data-theme'), 'dark', 'unknown themes fall back to Midnight');
+  w.close();
+});
+
 test('theme-dependent bars use tokens, not hardcoded dark', async () => {
   const html = fs.readFileSync('docs/index.html', 'utf8');
   assert.match(html, /linear-gradient\(180deg, var\(--bar-top\)/, 'the top bar follows the theme');

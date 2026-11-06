@@ -16,7 +16,7 @@
 <meta property="og:title" content="Ai'sHub — your free AI agent" />
 <meta property="og:description" content="Chat + agent mode, 100+ models, auto-added new models, offline engine. Free forever." />
 <meta property="og:image" content="icon-512.png" />
-<meta name="build" content="2026-11-06 / b85818c7529d" />
+<meta name="build" content="2026-11-06 / 9ecfc688f381" />
 <style>
 <style>
 /* ═════════════ Ai'sHub design tokens ═════════════ */
@@ -41,6 +41,9 @@
   --brand: #7c5cff;
   --brand-2: #22d3ee;
   --brand-3: #ff7ab6;
+  /* text that is not plain white/black: headings, emphasis, links */
+  --heading: #c3b0ff;
+  --accent: #22d3ee;
   --brand-grad: linear-gradient(135deg, #6d5bff 0%, #a855f7 45%, #22d3ee 100%);
   --ok: #34d399;
   --warn: #fbbf24;
@@ -73,7 +76,92 @@ html[data-theme="light"] {
   --bar-fade: rgba(255, 255, 255, 0.66);
   --chip-bg: rgba(255, 255, 255, 0.92);
   --overlay: rgba(14, 14, 34, 0.42);
+  --heading: #4b2fd6;
+  --accent: #0e7490;
+  --brand: #5b3df5;
+  --brand-2: #0e7490;
   --shadow: 0 12px 34px -20px rgba(20, 20, 60, 0.45);
+}
+
+/* ── Aurora: deep teal, mint text, emerald headings ──────────────────────── */
+html[data-theme="aurora"] {
+  --bg: #04120f;
+  --bg-2: #061a16;
+  --bg-3: #0a231d;
+  --surface: #0a231d;
+  --surface-2: #0e2c25;
+  --surface-3: #143a31;
+  --line: #1c4c40;
+  --line-soft: #123329;
+  --text: #e9fff8;
+  --text-2: #aae5d5;
+  --text-3: #7dbfae;
+  --heading: #4ade80;
+  --accent: #38e8d0;
+  --brand: #10b981;
+  --brand-2: #38e8d0;
+  --brand-3: #a3e635;
+  --brand-grad: linear-gradient(135deg, #059669 0%, #22d3ee 100%);
+  --user-bubble: linear-gradient(135deg, #047857 0%, #0891b2 100%);
+  --bar-top: rgba(4, 18, 15, 0.94);
+  --bar-fade: rgba(4, 18, 15, 0.6);
+  --chip-bg: rgba(10, 35, 29, 0.9);
+  --overlay: rgba(2, 10, 8, 0.66);
+  --shadow: 0 12px 40px -18px rgba(0, 0, 0, 0.85);
+}
+
+/* ── Sunset: warm charcoal, peach text, amber headings ───────────────────── */
+html[data-theme="sunset"] {
+  --bg: #150b0a;
+  --bg-2: #1d100e;
+  --bg-3: #261514;
+  --surface: #261514;
+  --surface-2: #321b18;
+  --surface-3: #40231f;
+  --line: #4f2c26;
+  --line-soft: #3a201c;
+  --text: #ffece3;
+  --text-2: #f3c3ae;
+  --text-3: #cf9a86;
+  --heading: #ffab73;
+  --accent: #ff8fc7;
+  --brand: #f97316;
+  --brand-2: #ff8fc7;
+  --brand-3: #fbbf24;
+  --brand-grad: linear-gradient(135deg, #f97316 0%, #ff7ab6 100%);
+  --user-bubble: linear-gradient(135deg, #c2410c 0%, #be185d 100%);
+  --bar-top: rgba(21, 11, 10, 0.94);
+  --bar-fade: rgba(21, 11, 10, 0.6);
+  --chip-bg: rgba(38, 21, 20, 0.9);
+  --overlay: rgba(10, 5, 5, 0.68);
+  --shadow: 0 12px 40px -18px rgba(0, 0, 0, 0.85);
+}
+
+/* ── Neon: violet night, lilac text, magenta headings ────────────────────── */
+html[data-theme="neon"] {
+  --bg: #0b0413;
+  --bg-2: #12061d;
+  --bg-3: #1a0a28;
+  --surface: #1a0a28;
+  --surface-2: #24102f;
+  --surface-3: #2f1540;
+  --line: #3d1c52;
+  --line-soft: #2b1239;
+  --text: #fdf2ff;
+  --text-2: #dcc0ee;
+  --text-3: #b294c6;
+  --heading: #f472ff;
+  --accent: #22d3ee;
+  --brand: #a855f7;
+  --brand-2: #22d3ee;
+  --brand-3: #f472ff;
+  --brand-grad: linear-gradient(135deg, #a855f7 0%, #22d3ee 100%);
+  --user-bubble: linear-gradient(135deg, #7e22ce 0%, #0891b2 100%);
+  --bar-top: rgba(11, 4, 19, 0.94);
+  --bar-fade: rgba(11, 4, 19, 0.6);
+  --chip-bg: rgba(26, 10, 40, 0.9);
+  --overlay: rgba(6, 2, 10, 0.7);
+  --shadow: 0 12px 40px -18px rgba(0, 0, 0, 0.85);
 }
 
 * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
@@ -102,9 +190,9 @@ html[data-theme="light"] body::before { opacity: 0.55; }
 button, input, textarea, select { font: inherit; color: inherit; }
 button { border: 0; background: none; cursor: pointer; padding: 0; }
 input, textarea, select { outline: none; }
-a { color: var(--brand-2); text-decoration: none; }
+a { color: var(--accent); text-decoration: none; }
 svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; }
-h1, h2, h3, h4 { margin: 0; font-weight: 700; letter-spacing: -0.02em; }
+h1, h2, h3, h4 { margin: 0; font-weight: 700; letter-spacing: -0.02em; color: var(--heading); }
 p { margin: 0; }
 ::selection { background: rgba(124, 92, 255, 0.35); }
 
@@ -539,14 +627,15 @@ html[data-theme="light"] .tabbar { background: rgba(255, 255, 255, 0.9); }
 .prose h3 { font-size: 15.5px; }
 .prose ul, .prose ol { margin: 0 0 10px; padding-left: 22px; }
 .prose li { margin: 3px 0; }
-.prose li::marker { color: var(--text-3); }
-.prose strong { font-weight: 700; color: #fff; }
-html[data-theme="light"] .prose strong { color: #000; }
+.prose li::marker { color: var(--accent); }
+.prose strong { font-weight: 700; color: var(--heading); }
+/* headings and emphasis take the theme colour, so text is never plain black/white */
+.prose h1, .prose h2, .prose h3 { color: var(--heading); }
 .prose em { font-style: italic; }
-.prose a { color: var(--brand-2); border-bottom: 1px solid rgba(34, 211, 238, 0.35); }
+.prose a { color: var(--accent); border-bottom: 1px solid currentColor; }
 .prose code {
   font-family: var(--mono); font-size: 12.8px; padding: 2px 6px; border-radius: 6px;
-  background: var(--surface-3); color: #ffd7a8; border: 1px solid var(--line);
+  background: var(--surface-3); color: var(--accent); border: 1px solid var(--line);
 }
 .prose blockquote {
   margin: 0 0 10px; padding: 8px 13px; border-left: 3px solid var(--brand);
@@ -866,6 +955,26 @@ input[type="range"]::-webkit-slider-thumb {
   margin: 7px 0 0; font-family: var(--mono); font-size: 11px; color: var(--text-3);
   white-space: pre-wrap; word-break: break-word; max-height: 150px; overflow: auto;
 }
+
+/* ═════════════ theme picker ═════════════ */
+.theme-grid { display: flex; flex-wrap: wrap; gap: 8px; }
+.theme-chip {
+  display: inline-flex; align-items: center; gap: 8px;
+  height: 38px; padding: 0 13px; border-radius: 12px;
+  border: 1px solid var(--line); background: var(--surface-2);
+  color: var(--text-2); font-size: 13px; font-weight: 600;
+  transition: border-color 0.18s var(--ease), color 0.18s var(--ease), transform 0.16s var(--ease);
+}
+.theme-chip:active { transform: scale(0.97); }
+.theme-chip[aria-pressed="true"] {
+  border-color: var(--brand); color: var(--text);
+  box-shadow: inset 0 0 0 1px var(--brand);
+}
+.theme-swatch {
+  width: 15px; height: 15px; border-radius: 50%;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.18);
+  flex: none;
+}
 </style>
 </style>
 </head>
@@ -1093,7 +1202,7 @@ input[type="range"]::-webkit-slider-thumb {
         <img src="logo.png" alt="" width="34" height="34" class="logo-img" />
         <div>
           <strong>Ai'sHub</strong>
-          <small id="drawer-version">v1.0.3</small>
+          <small id="drawer-version">v1.0.4</small>
         </div>
       </div>
       <button class="icon-btn" id="drawer-close" aria-label="Close"><svg viewBox="0 0 24 24"><path d="m6 6 12 12M18 6 6 18" /></svg></button>
@@ -1150,7 +1259,7 @@ var __async = (__this, __arguments, generator) => {
 (function() {
   "use strict";
   const A = window.A = window.A || {};
-  A.VERSION = "1.0.3";
+  A.VERSION = "1.0.4";
   A.BUILD = "2026-11-06";
   const uid = (prefix = "") => prefix + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
   const clamp = (n, min, max) => Math.max(min, Math.min(max, n));
@@ -8756,16 +8865,33 @@ var __async = (__this, __arguments, generator) => {
         onChange: (v) => s.set("agentMaxSteps", v, { silent: true })
       })
     );
-    host.querySelector("#theme-host").appendChild(
-      A.ui.segmented(
-        [{ value: "dark", label: "Dark" }, { value: "light", label: "Light" }, { value: "system", label: "System" }],
-        s.get("theme") || "system",
-        (v) => {
-          s.set("theme", v);
+    const themeHost = host.querySelector("#theme-host");
+    if (themeHost) {
+      themeHost.innerHTML = "";
+      const grid = document.createElement("div");
+      grid.className = "theme-grid";
+      const chips = [];
+      const themes = A.app.themes();
+      const options = [{ id: "system", label: "Follow phone", swatch: ["#5b5b6b", "#9aa0b8", "#22d3ee"] }].concat(themes);
+      options.forEach((t) => {
+        const chip = document.createElement("button");
+        chip.className = "theme-chip";
+        chip.type = "button";
+        chip.setAttribute("aria-pressed", "false");
+        chip.innerHTML = `<span class="theme-swatch" style="background:linear-gradient(135deg, ${t.swatch[0]} 0 50%, ${t.swatch[1]} 50% 75%, ${t.swatch[2]} 75% 100%)"></span>${A.util.escapeHtml(t.label)}`;
+        chip.addEventListener("click", () => {
+          s.set("theme", t.id);
           A.app.applyTheme();
-        }
-      )
-    );
+          chips.forEach((c) => c.setAttribute("aria-pressed", String(c === chip)));
+          toast(`${t.label} theme`, "ok", 1200);
+        });
+        chips.push(chip);
+        grid.appendChild(chip);
+      });
+      const current = s.get("theme") || "system";
+      chips.forEach((c, i) => c.setAttribute("aria-pressed", String(options[i].id === current)));
+      themeHost.appendChild(grid);
+    }
     host.querySelector("#locale-host").appendChild(
       A.ui.segmented(
         [{ value: "auto", label: "Auto" }, { value: "en", label: "English" }, { value: "bn", label: "বাংলা" }],
@@ -9086,12 +9212,27 @@ var __async = (__this, __arguments, generator) => {
   const media = (query) => typeof window.matchMedia === "function" ? window.matchMedia(query) : { matches: false, addEventListener() {
   }, addListener() {
   } };
+  const THEMES = [
+    { id: "dark", label: "Midnight", swatch: ["#07070b", "#c3b0ff", "#22d3ee"], base: "dark" },
+    { id: "light", label: "Daylight", swatch: ["#f6f6fb", "#4b2fd6", "#0e7490"], base: "light" },
+    { id: "aurora", label: "Aurora", swatch: ["#04120f", "#4ade80", "#38e8d0"], base: "dark" },
+    { id: "sunset", label: "Sunset", swatch: ["#150b0a", "#ffab73", "#ff8fc7"], base: "dark" },
+    { id: "neon", label: "Neon", swatch: ["#0b0413", "#f472ff", "#22d3ee"], base: "dark" }
+  ];
+  const THEME_IDS = THEMES.map((t) => t.id);
+  const THEME_COLOR = { dark: "#07070B", light: "#f6f6fb", aurora: "#04120f", sunset: "#150b0a", neon: "#0b0413" };
   function applyTheme() {
+    var _a, _b;
     const pref = A.settings.get("theme") || "system";
-    const dark = pref === "dark" || pref === "system" && media("(prefers-color-scheme: dark)").matches;
-    document.documentElement.setAttribute("data-theme", dark ? "dark" : "light");
+    let theme = pref;
+    if (pref === "system") theme = media("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+    if (THEME_IDS.indexOf(theme) === -1) theme = "dark";
+    document.documentElement.setAttribute("data-theme", theme);
+    const base = (THEMES.find((t) => t.id === theme) || THEMES[0]).base;
+    document.documentElement.style.colorScheme = base === "light" ? "light" : "dark";
     const meta = document.querySelector('meta[name="theme-color"]');
-    if (meta) meta.setAttribute("content", dark ? "#07070B" : "#f6f6fb");
+    if (meta) meta.setAttribute("content", THEME_COLOR[theme] || "#07070B");
+    (_b = (_a = A.bus) == null ? void 0 : _a.emit) == null ? void 0 : _b.call(_a, "theme:changed", theme);
   }
   function haptic(ms = 8) {
     var _a;
@@ -9499,6 +9640,7 @@ var __async = (__this, __arguments, generator) => {
   }
   A.app = {
     go,
+    themes: () => THEMES.slice(),
     haptic,
     start,
     applyTheme,

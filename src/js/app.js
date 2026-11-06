@@ -33,12 +33,33 @@
 
   const media = (query) => (typeof window.matchMedia === 'function' ? window.matchMedia(query) : { matches: false, addEventListener() {}, addListener() {} });
 
+  /* ─────────────── themes ───────────────
+     Each theme is a full palette: background, tinted body text, coloured
+     headings and its own accent. "system" follows the phone and resolves to
+     one of the two base palettes. */
+  const THEMES = [
+    { id: 'dark', label: 'Midnight', swatch: ['#07070b', '#c3b0ff', '#22d3ee'], base: 'dark' },
+    { id: 'light', label: 'Daylight', swatch: ['#f6f6fb', '#4b2fd6', '#0e7490'], base: 'light' },
+    { id: 'aurora', label: 'Aurora', swatch: ['#04120f', '#4ade80', '#38e8d0'], base: 'dark' },
+    { id: 'sunset', label: 'Sunset', swatch: ['#150b0a', '#ffab73', '#ff8fc7'], base: 'dark' },
+    { id: 'neon', label: 'Neon', swatch: ['#0b0413', '#f472ff', '#22d3ee'], base: 'dark' },
+  ];
+  const THEME_IDS = THEMES.map((t) => t.id);
+  const THEME_COLOR = { dark: '#07070B', light: '#f6f6fb', aurora: '#04120f', sunset: '#150b0a', neon: '#0b0413' };
+
   function applyTheme() {
     const pref = A.settings.get('theme') || 'system';
-    const dark = pref === 'dark' || (pref === 'system' && media('(prefers-color-scheme: dark)').matches);
-    document.documentElement.setAttribute('data-theme', dark ? 'dark' : 'light');
+    let theme = pref;
+    if (pref === 'system') theme = media('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+    if (THEME_IDS.indexOf(theme) === -1) theme = 'dark';
+
+    document.documentElement.setAttribute('data-theme', theme);
+    const base = (THEMES.find((t) => t.id === theme) || THEMES[0]).base;
+    document.documentElement.style.colorScheme = base === 'light' ? 'light' : 'dark';
+
     const meta = document.querySelector('meta[name="theme-color"]');
-    if (meta) meta.setAttribute('content', dark ? '#07070B' : '#f6f6fb');
+    if (meta) meta.setAttribute('content', THEME_COLOR[theme] || '#07070B');
+    A.bus?.emit?.('theme:changed', theme);
   }
 
   /** short vibration when the device supports it */
@@ -497,6 +518,7 @@
 
   A.app = {
     go,
+    themes: () => THEMES.slice(),
     haptic,
     start,
     applyTheme,

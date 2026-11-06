@@ -232,17 +232,37 @@
       })
     );
 
-    /* ── theme ── */
-    host.querySelector('#theme-host').appendChild(
-      A.ui.segmented(
-        [{ value: 'dark', label: 'Dark' }, { value: 'light', label: 'Light' }, { value: 'system', label: 'System' }],
-        s.get('theme') || 'system',
-        (v) => {
-          s.set('theme', v);
+    /* ── theme: real palettes with visible swatches ── */
+    const themeHost = host.querySelector('#theme-host');
+    if (themeHost) {
+      themeHost.innerHTML = '';
+      const grid = document.createElement('div');
+      grid.className = 'theme-grid';
+
+      const chips = [];
+      const themes = A.app.themes();
+      const options = [{ id: 'system', label: 'Follow phone', swatch: ['#5b5b6b', '#9aa0b8', '#22d3ee'] }].concat(themes);
+
+      options.forEach((t) => {
+        const chip = document.createElement('button');
+        chip.className = 'theme-chip';
+        chip.type = 'button';
+        chip.setAttribute('aria-pressed', 'false');
+        chip.innerHTML = `<span class="theme-swatch" style="background:linear-gradient(135deg, ${t.swatch[0]} 0 50%, ${t.swatch[1]} 50% 75%, ${t.swatch[2]} 75% 100%)"></span>${A.util.escapeHtml(t.label)}`;
+        chip.addEventListener('click', () => {
+          s.set('theme', t.id);
           A.app.applyTheme();
-        }
-      )
-    );
+          chips.forEach((c) => c.setAttribute('aria-pressed', String(c === chip)));
+          toast(`${t.label} theme`, 'ok', 1200);
+        });
+        chips.push(chip);
+        grid.appendChild(chip);
+      });
+
+      const current = s.get('theme') || 'system';
+      chips.forEach((c, i) => c.setAttribute('aria-pressed', String(options[i].id === current)));
+      themeHost.appendChild(grid);
+    }
 
     /* ── locale ── */
     host.querySelector('#locale-host').appendChild(
