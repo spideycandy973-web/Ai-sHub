@@ -372,6 +372,25 @@ test('time and duration parsing handles am/pm, noon and words', () => {
   assert.equal(P.parseDuration('timer for 2 hours'), 7200);
 });
 
+test('hidden overlays are really hidden (an always-on backdrop ate every tap)', async () => {
+  const html = fs.readFileSync('docs/index.html', 'utf8');
+  assert.match(html, /\[hidden\]\s*\{\s*display:\s*none\s*!important/, 'the [hidden] rule ships');
+
+  const dom = await JSDOM.fromFile('docs/index.html', { runScripts: 'dangerously', pretendToBeVisual: true, url: 'https://localhost/' });
+  const w = dom.window;
+  await new Promise((r) => setTimeout(r, 900));
+  for (const id of ['drawer', 'sheet', 'sheet-backdrop']) {
+    const el = w.document.getElementById(id);
+    if (!el) continue;
+    assert.equal(el.hasAttribute('hidden'), true, `#${id} starts hidden`);
+    assert.equal(w.getComputedStyle(el).display, 'none', `#${id} must not be painted over the app`);
+  }
+  // a class that sets display must never beat the attribute
+  const css = html.slice(html.indexOf('.drawer'));
+  assert.ok(css.includes('display: flex'), 'the drawer really does set display:flex, so the rule is load-bearing');
+  w.close();
+});
+
 test('the app still boots when IndexedDB is unavailable (no blank screen)', async () => {
   // A device where storage is blocked used to leave the HTML splash on screen forever.
   const dom = await JSDOM.fromFile('docs/index.html', {

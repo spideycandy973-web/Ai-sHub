@@ -16,7 +16,7 @@
 <meta property="og:title" content="Ai'sHub — your free AI agent" />
 <meta property="og:description" content="Chat + agent mode, 100+ models, auto-added new models, offline engine. Free forever." />
 <meta property="og:image" content="icon-512.png" />
-<meta name="build" content="2026-11-06 / 4db30d353a38" />
+<meta name="build" content="2026-11-06 / 153438080df0" />
 <style>
 <style>
 /* ═════════════ Ai'sHub design tokens ═════════════ */
@@ -225,6 +225,12 @@ textarea.input { height: auto; min-height: 84px; padding: 11px 13px; resize: ver
 .hstack { display: flex; align-items: center; gap: 10px; }
 .vstack { display: flex; flex-direction: column; gap: 10px; }
 .spacer { flex: 1; }
+/* The `hidden` attribute must always win. Without this rule any class that sets
+   `display` (the drawer is display:flex, the backdrops are fixed overlays) stays on
+   screen forever: a permanently visible backdrop swallows every tap and the drawer
+   paints OVER modals, which looks exactly like a frozen, unresponsive app. */
+[hidden] { display: none !important; }
+
 .hidden { display: none !important; }
 
 /* ═════════════ toast ═════════════ */
@@ -1077,7 +1083,7 @@ input[type="range"]::-webkit-slider-thumb {
         <img src="logo.png" alt="" width="34" height="34" class="logo-img" />
         <div>
           <strong>Ai'sHub</strong>
-          <small id="drawer-version">v1.0.1</small>
+          <small id="drawer-version">v1.0.2</small>
         </div>
       </div>
       <button class="icon-btn" id="drawer-close" aria-label="Close"><svg viewBox="0 0 24 24"><path d="m6 6 12 12M18 6 6 18" /></svg></button>
@@ -1134,7 +1140,7 @@ var __async = (__this, __arguments, generator) => {
 (function() {
   "use strict";
   const A = window.A = window.A || {};
-  A.VERSION = "1.0.1";
+  A.VERSION = "1.0.2";
   A.BUILD = "2026-11-06";
   const uid = (prefix = "") => prefix + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
   const clamp = (n, min, max) => Math.max(min, Math.min(max, n));

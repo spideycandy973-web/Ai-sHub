@@ -6,13 +6,16 @@ import android.content.Context;
 import android.content.SharedPreferences;
 import android.content.pm.PackageInfo;
 import android.graphics.Color;
+import android.graphics.Insets;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
 import android.util.Log;
 import android.util.TypedValue;
+import android.view.View;
 import android.view.ViewGroup;
+import android.view.WindowInsets;
 import android.webkit.ValueCallback;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
@@ -71,6 +74,10 @@ public class MainActivity extends BridgeActivity {
         try {
             WebView.setWebContentsDebuggingEnabled(true);
             ui.postDelayed(this::checkBoot, 5000);
+            // Android 15+ draws apps edge to edge: without real insets the header sits
+            // under the clock and the tab bar under the gesture handle.
+            ui.postDelayed(this::applyInsets, 1200);
+            ui.postDelayed(this::applyInsets, 2500);
         } catch (Throwable t) {
             Log.e(TAG, "could not schedule the boot check", t);
         }
@@ -144,6 +151,7 @@ public class MainActivity extends BridgeActivity {
                     String report = unquote(value);
                     if (report.contains("boot=true")) {
                         Log.i(TAG, "boot ok: " + report);
+                        applyInsets();
                         return;
                     }
                     attempts++;
@@ -162,6 +170,41 @@ public class MainActivity extends BridgeActivity {
             });
         } catch (Throwable t) {
             showOverlay("Could not inspect the page", t.toString() + "\n\n" + environment());
+        }
+    }
+
+    /** Push the real status/navigation bar heights into the page as CSS variables.
+     *  WebView reports env(safe-area-inset-*) as 0, so layout has to be told. */
+    private void applyInsets() {
+        try {
+            WebView webView = getBridge() != null ? getBridge().getWebView() : null;
+            if (webView == null) return;
+
+            View decor = getWindow().getDecorView();
+            WindowInsets wi = decor.getRootWindowInsets();
+            if (wi == null) return;
+
+            int top;
+            int bottom;
+            if (Build.VERSION.SDK_INT >= 30) {
+                Insets bars = wi.getInsets(WindowInsets.Type.systemBars());
+                top = bars.top;
+                bottom = bars.bottom;
+            } else {
+                top = wi.getSystemWindowInsetTop();
+                bottom = wi.getSystemWindowInsetBottom();
+            }
+
+            float density = getResources().getDisplayMetrics().density;
+            final int topDp = Math.round(top / density);
+            final int bottomDp = Math.round(bottom / density);
+
+            String js = "document.documentElement.style.setProperty('--safe-t','" + topDp + "px');"
+                + "document.documentElement.style.setProperty('--safe-b','" + bottomDp + "px');";
+            webView.evaluateJavascript(js, null);
+            Log.i(TAG, "insets applied: top=" + topDp + "dp bottom=" + bottomDp + "dp");
+        } catch (Throwable t) {
+            Log.w(TAG, "could not apply window insets", t);
         }
     }
 

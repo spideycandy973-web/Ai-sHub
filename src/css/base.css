@@ -204,6 +204,12 @@ textarea.input { height: auto; min-height: 84px; padding: 11px 13px; resize: ver
 .hstack { display: flex; align-items: center; gap: 10px; }
 .vstack { display: flex; flex-direction: column; gap: 10px; }
 .spacer { flex: 1; }
+/* The `hidden` attribute must always win. Without this rule any class that sets
+   `display` (the drawer is display:flex, the backdrops are fixed overlays) stays on
+   screen forever: a permanently visible backdrop swallows every tap and the drawer
+   paints OVER modals, which looks exactly like a frozen, unresponsive app. */
+[hidden] { display: none !important; }
+
 .hidden { display: none !important; }
 
 /* ═════════════ toast ═════════════ */
