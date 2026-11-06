@@ -327,11 +327,17 @@
     const userMsg = { role: 'user', content: text, ts: Date.now(), attachments: state.draftAttachments };
     state.draftAttachments = [];
     state.messages.push(userMsg);
-    await A.chatStore.append(state.chatId, userMsg);
+
+    // Paint the user's message BEFORE touching storage. Persisting through a
+    // wedged IndexedDB used to happen first, so the text vanished and nothing
+    // on screen ever changed — the app looked frozen and "not responding".
     dom.welcome.hidden = true;
     dom.messages.appendChild(messageNode(userMsg));
     scrollToBottom();
     updateComposerHint();
+    await A.chatStore.append(state.chatId, userMsg).catch((err) => {
+      console.warn('[chat] could not persist message', err);
+    });
 
     if (mode === 'agent') return runAgentTurn(text);
 
@@ -382,6 +388,31 @@
           role: 'user',
           content: (state.messages.slice(-1)[0].content || '') + '\n\n(An image was attached but this model cannot view images.)',
         };
+      }
+
+      // Phone actions first: if the user asked the phone to do something,
+      // perform it instead of describing how to do it.
+      if (A.phoneActions && A.phoneActions.looksLikePhoneRequest(text)) {
+        const handled = await A.phoneActions.tryHandle(text);
+        if (handled) {
+          full = handled.text;
+          const saved = {
+            ...placeholder,
+            content: full,
+            model: 'phone',
+            modelName: 'Phone control',
+            streaming: false,
+            ms: Date.now() - started,
+          };
+          state.messages.push(saved);
+          await A.chatStore.append(state.chatId, saved).catch(() => {});
+          const fresh = messageNode(saved);
+          node.replaceWith(fresh);
+          A.markdown.bindCopy(fresh);
+          if (nearBottom()) scrollToBottom();
+          setBusy(false);
+          return;
+        }
       }
 
       const res = await A.ai.chat({

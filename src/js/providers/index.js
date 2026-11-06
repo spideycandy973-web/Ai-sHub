@@ -64,6 +64,22 @@
     return ladder;
   }
 
+  /** Models worth trying before the on-device engine when the phone is online. */
+  function cloudLadder(exclude) {
+    const all = A.catalog.all().filter((m) => !isLocal(m) && readiness(m).ready);
+    const rank = (m) => (m.provider === 'pollinations' ? 0 : m.free ? 1 : 2);
+    return all
+      .filter((m) => !exclude || A.catalog.keyFor(m) !== A.catalog.keyFor(exclude))
+      .sort((a, b) => rank(a) - rank(b))
+      .slice(0, 4);
+  }
+
+  /** Cloud first: an LLM answer beats the local engine whenever a network exists. */
+  function wantsCloud() {
+    if (!A.net.online) return false;
+    return A.settings.get('autoCloud') !== false;
+  }
+
   /**
    * Complete a chat turn.
    * @param {object} opts
@@ -80,6 +96,33 @@
     const sys = system !== undefined ? system : buildSystemPrompt();
 
     if (isLocal(target)) {
+      // The on-device engine is a fallback, not the default brain. With a network,
+      // try a real model first so the app behaves like a proper agent.
+      if (wantsCloud() && !noFallback) {
+        for (const alt of cloudLadder(null)) {
+          if (signal?.aborted) break;
+          try {
+            onFallback?.({ from: target, to: alt, reason: 'Using a cloud model' });
+            const altProvider = A.catalog.providerById(alt.provider);
+            const res = await A.providerClient.complete({
+              provider: altProvider,
+              modelId: alt.id,
+              messages,
+              system: sys,
+              signal,
+              onDelta,
+              temperature,
+              maxTokens,
+            });
+            if (res.text && res.text.trim()) {
+              return { ...res, model: alt.id, provider: alt.provider, usedFallback: true, autoCloud: true, fallbackFrom: target };
+            }
+          } catch (e) {
+            if (signal?.aborted) return Promise.reject(e);
+            continue;
+          }
+        }
+      }
       const res = await A.offlineEngine.chat({ messages, model: target?.id || 'aishub-core-1', onDelta, signal });
       return { ...res, model: target?.id || 'aishub-core-1', provider: 'local', usedFallback: false };
     }

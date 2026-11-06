@@ -66,10 +66,105 @@ jobs:
 
       - name: Build the web bundle and inline it into the native project
         run: |
+          set -euo pipefail
           npm run build
           npx cap copy android
           test -f android/app/src/main/assets/public/index.html
           echo "bundled index.html: $(wc -c < android/app/src/main/assets/public/index.html) bytes"
+
+          # Refuse to package a shell whose CSS/JS never got inlined: that ships an
+          # unstyled app whose composer is off-screen, i.e. "the AI won't respond".
+          BUNDLE=android/app/src/main/assets/public/index.html
+          if grep -q '@include' "$BUNDLE"; then
+            echo "::error::unresolved @include markers in the bundled web app"; exit 1
+          fi
+          node -e '
+            const fs = require("fs");
+            const h = fs.readFileSync(process.argv[1], "utf8");
+            const css = [...h.matchAll(/<style>([\s\S]*?)<\/style>/g)].map(m => m[1]).join("");
+            const js  = [...h.matchAll(/<script>([\s\S]*?)<\/script>/g)].map(m => m[1]).join("");
+            console.log(`bundled css=${css.length} js=${js.length}`);
+            if (css.length < 20000) { console.error("::error::bundled stylesheet is missing or truncated"); process.exit(1); }
+            if (js.length < 100000) { console.error("::error::bundled javascript is missing or truncated"); process.exit(1); }
+            for (const sel of [".tabbar", ".composer-wrap", ".screen"]) {
+              if (!css.includes(sel)) { console.error(`::error::bundled CSS lacks the ${sel} rule`); process.exit(1); }
+            }
+          ' "$BUNDLE"
+
+      - name: Run the test suite
+        run: npm test
+      - name: Stamp the build revision into the APK
+        run: |
+          set -euo pipefail
+          REV=$(git rev-parse --short HEAD)
+          cat > android/app/src/main/res/values/build_info.xml <<EOF
+          <?xml version="1.0" encoding="utf-8"?>
+          <resources>
+              <string name="build_rev" translatable="false">$REV</string>
+          </resources>
+          EOF
+          cat android/app/src/main/res/values/build_info.xml
+          echo "stamped build $REV"
+
+      - name: Check Android resources before Gradle runs
+        run: |
+          # aapt2 aborts the whole build on a single unescaped apostrophe
+          # ("Can not extract resource"). Catch it in a second, not a build.
+          python3 - <<'PYEOF'
+          import re, pathlib, sys
+          bad = 0
+          for f in sorted(pathlib.Path("android/app/src/main/res/values").glob("*.xml")):
+              src = f.read_text(encoding="utf-8")
+              for m in re.finditer(r'<(string|item)[^>]*name="([^"]+)"[^>]*>(.*?)</\1>', src, re.S):
+                  body = m.group(3)
+                  # a backslash-escaped apostrophe is fine; a bare one is not
+                  for i, ch in enumerate(body):
+                      if ch == "'" and (i == 0 or body[i - 1] != "\\"):
+                          print(f"::error file={f}::unescaped apostrophe in \"{m.group(2)}\"")
+                          bad += 1
+                          break
+          if bad:
+              sys.exit(1)
+          print("resources: apostrophes are escaped")
+          PYEOF
+
+      - name: Provision the release signing key
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          KEY=android/aishub-release.jks
+          if [ -f "$KEY" ]; then echo "keystore already in the tree"; exit 0; fi
+
+          # The same key must be used for every build, otherwise Android refuses
+          # to install the update over the previous version.
+          REMOTE="https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+          TMP=$(mktemp -d)
+          if git clone --quiet --depth 1 --branch signing "$REMOTE" "$TMP/key" 2>/dev/null \
+             && [ -f "$TMP/key/aishub-release.jks" ]; then
+            cp "$TMP/key/aishub-release.jks" "$KEY"
+            echo "restored the existing release keystore from the 'signing' branch"
+          else
+            echo "creating the release keystore"
+            keytool -genkeypair -v \
+              -keystore "$KEY" -storetype JKS -storepass aishub-release \
+              -alias aishub -keypass aishub-release \
+              -keyalg RSA -keysize 2048 -validity 10950 \
+              -dname "CN=Ai'sHub, OU=Mobile, O=Ai'sHub, L=Chattogram, C=BD" 2>&1 | tail -2
+            mkdir -p "$TMP/pub"
+            cp "$KEY" "$TMP/pub/"
+            (
+              cd "$TMP/pub"
+              git init -q -b signing
+              git add aishub-release.jks
+              git -c user.name=aishub-ci -c user.email=ci@users.noreply.github.com \
+                  commit -q -m "store the Ai'sHub release signing key"
+              git push -q -f "$REMOTE" signing && echo "keystore stored on the 'signing' branch"
+            )
+          fi
+          ls -l "$KEY"
+          keytool -list -keystore "$KEY" -storepass aishub-release | tail -2
+
 
       - name: Make gradlew executable
         run: chmod +x android/gradlew
@@ -93,15 +188,22 @@ jobs:
 
       - name: Build release APK (debug-signed, installable)
         working-directory: android
-        run: ./gradlew --no-daemon --stacktrace assembleRelease 2>&1 | tee ../gradle-release.log || true
+        run: |
+          set -o pipefail
+          ./gradlew --no-daemon --stacktrace assembleRelease 2>&1 | tee ../gradle-release.log
 
       - name: Collect artifacts
         if: always()
         run: |
+          set -x
           mkdir -p out
+          ( cd android && ./gradlew --no-daemon -q :app:signingReport ) 2>&1 | tee signing-report.txt || true
           find android/app/build/outputs/apk -name '*.apk' -exec cp -v {} out/ \; || true
           ls -lh out || true
           # keep the build log for the artifact so failures are inspectable from the repo
+          echo '--- signing state ---'
+          ls -l android/aishub-release.jks 2>/dev/null || echo "(no keystore in android/)"
+          grep -n 'signingConfig' android/app/build.gradle || echo "(no signingConfig in build.gradle)"
           cp gradle-debug.log out/ 2>/dev/null || true
           cp gradle-release.log out/ 2>/dev/null || true
           # error-only digest: tiny, greppable from the repo
@@ -119,6 +221,129 @@ jobs:
           retention-days: 90
 
 
+      - name: Diagnose failure (if the build failed)
+        if: failure()
+        run: |
+          echo "::error::Gradle failed — see the AiHub-apk artifact (errors.txt / gradle-debug.log)"
+          sed -n '/What went wrong/,/^\*/p' gradle-debug.log 2>/dev/null | head -40 || true
+          grep -iE 'Could not (find|resolve)|Unsupported class|requires Gradle|SDK location|license' gradle-debug.log 2>/dev/null | head -20 || true
+
+      - name: Verify the APK really contains the working app
+        if: success()
+        run: |
+          set -euo pipefail
+          exec > >(tee verify.log) 2>&1
+          APK=$(find out -name '*-release.apk' | head -1)
+          echo "verifying $APK"
+          BT=$(ls -d "$ANDROID_HOME/build-tools/"* | sort -V | tail -1)
+
+          PKG=$("$BT/aapt2" dump badging "$APK" | sed -n "s/^package: name='\\([^']*\\)'.*/\\1/p")
+          echo "package id: $PKG"
+          echo "=== what this APK demands of the phone ==="
+          "$BT/aapt2" dump badging "$APK" | grep -E "sdkVersion|targetSdkVersion|native-code" || true
+          [ "$PKG" = "com.aishub" ] || { echo "::error::package is '$PKG', expected com.aishub"; exit 1; }
+
+          "$BT/apksigner" verify "$APK" || { echo "::error::APK signature does not verify"; exit 1; }
+
+          unzip -p "$APK" assets/public/index.html > bundled.html
+          [ -s bundled.html ] || { echo "::error::APK contains no bundled web app"; exit 1; }
+          node -e '
+            const fs = require("fs");
+            const h = fs.readFileSync("bundled.html", "utf8");
+            const css = [...h.matchAll(/<style>([\s\S]*?)<\/style>/g)].map(m => m[1]).join("");
+            const js  = [...h.matchAll(/<script>([\s\S]*?)<\/script>/g)].map(m => m[1]).join("");
+            console.log(`APK bundle: ${h.length} bytes | css ${css.length} chars | js ${js.length} chars | @include ${h.split("@include").length - 1}`);
+            const fail = (m) => { console.error("::error::" + m); process.exit(1); };
+            if (h.includes("@include")) fail("APK ships unresolved @include markers");
+            if (css.length < 20000) fail("APK ships a nearly empty stylesheet (unstyled app)");
+            if (js.length < 100000) fail("APK ships a truncated script bundle");
+            // A blank white screen is the worst failure mode: prove the in-page guard ships,
+            // and that no ES2020 operator is left to break an older WebView parser.
+            if (!h.includes("AIHUB_BOOT_ERROR")) fail("APK ships no boot-error guard (a crash would look like a white screen)");
+            const es2020 = js.match(/\?\.[A-Za-z_$[(]|\?\?/g) || [];
+            if (es2020.length > 3) fail(`APK bundle has ${es2020.length} ES2020 operators - older WebViews blank-screen`);
+            console.log(`boot guard: present | ES2020 operators outside strings: ${es2020.length}`);
+            for (const sel of [".tabbar", ".composer-wrap", ".screen"]) {
+              if (!css.includes(sel)) fail(`APK stylesheet lacks the ${sel} rule`);
+            }
+          '
+
+          # The phone-control layer is native Java. Confirm it is really in the shipped dex
+          # instead of trusting that the web bundle alone made it in.
+          rm -rf dexcheck && mkdir dexcheck
+          unzip -o -q "$APK" 'classes*.dex' -d dexcheck
+          ls -l dexcheck
+          for sym in PhoneControl AiHubAccessibilityService screenAction tapByText accessibilityStatus; do
+            if grep -aq "$sym" dexcheck/classes*.dex; then
+              echo "dex: found $sym"
+            else
+              echo "::error::APK is missing native symbol $sym (phone control not compiled in)"
+              exit 1
+            fi
+          done
+
+          # And that the accessibility service is declared, otherwise screen taps can never work.
+          MANIFEST_DUMP=$("$BT/aapt2" dump xmltree "$APK" --file AndroidManifest.xml 2>&1 || true)
+          echo "$MANIFEST_DUMP" | head -3
+          case "$MANIFEST_DUMP" in
+            *AiHubAccessibilityService*)
+              echo "manifest: accessibility service declared" ;;
+            *)
+              echo "::error::APK manifest does not declare AiHubAccessibilityService"
+              exit 1 ;;
+          esac
+
+          # The APK must say which commit it was built from, otherwise a screenshot of a
+          # broken app cannot be tied to a build.
+          "$BT/aapt2" dump resources "$APK" > resources.txt 2>/dev/null || true
+          if grep -q 'build_rev' resources.txt; then
+            echo "resources: build revision stamped ($(grep -m1 -A1 'build_rev' resources.txt | tail -1 | tr -d ' '))"
+          else
+            echo "::error::APK carries no build_rev resource (cannot identify the running build)"
+            exit 1
+          fi
+
+      - name: Publish APK to the "builds" release
+        if: success() && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -o pipefail
+          exec > >(tee publish.log) 2>&1
+          tag=builds
+          gh release view "$tag" >/dev/null 2>&1 || gh release create "$tag" \
+            --title "Ai'sHub builds" \
+            --notes "Installable APKs built automatically from \`$GITHUB_REF_NAME\`.
+
+          **Package:** \`com.aishub\` · **App:** Ai'sHub
+
+          Download \`AisHub-<version>-release.apk\` (smaller) or \`-debug.apk\`, allow install from unknown sources, open it. No account needed; the app works offline." 
+          echo "=== OUT CONTENTS ==="; ls -l out
+          echo "=== apksigner probe ==="
+          BT=$(ls -d "$ANDROID_HOME/build-tools/"* | sort -V | tail -1)
+          for f in out/*.apk; do echo "--- $f"; "$BT/apksigner" verify --print-certs "$f" 2>&1 | head -6 || true; done
+          shopt -s nullglob
+          unsigned=(out/*unsigned*.apk)
+          if [ ${#unsigned[@]} -gt 0 ]; then
+            echo "::error::Refusing to publish: ${unsigned[*]} is unsigned and cannot be installed"
+            exit 1
+          fi
+          apks=(out/*.apk)
+          if [ ${#apks[@]} -eq 0 ]; then echo "::error::No APK produced"; exit 1; fi
+          BT=$(ls -d "$ANDROID_HOME/build-tools/"* | sort -V | tail -1)
+          for f in "${apks[@]}"; do
+            base=$(basename "$f")
+            case "$base" in
+              *release*) name="AisHub-$(node -p "require('./package.json').version")-release.apk" ;;
+              *) name="AisHub-$(node -p "require('./package.json').version")-debug.apk" ;;
+            esac
+            "$BT/apksigner" verify "$f" || { echo "::error::$base failed signature verification"; exit 1; }
+            cp "$f" "out/$name"
+            gh release upload "$tag" "out/$name" --clobber
+            echo "uploaded $name"
+          done
+          gh release view "$tag" --json assets -q '.assets[].name'
+
       - name: Report build logs to the log branch
         if: always()
         continue-on-error: true
@@ -131,6 +356,16 @@ jobs:
           [ -f "$digest" ] || echo "no errors.txt was produced" > "$digest"
           {
             echo "run: $GITHUB_RUN_ID | job: $GITHUB_JOB | ref: $GITHUB_REF_NAME"
+            echo
+            echo "===== verify.log ====="
+            cat verify.log 2>/dev/null || echo "(no verify.log — verify step did not run)"
+            echo
+            echo "===== publish.log ====="
+            cat publish.log 2>/dev/null || echo "(no publish.log — publish step did not run)"
+            echo
+            echo "===== out/ ====="
+            ls -la out 2>/dev/null || true
+            echo
             echo "conclusion of the build step is shown in the workflow summary"
             echo
             echo "===== errors.txt (first 60 matching lines) ====="
@@ -164,38 +399,3 @@ jobs:
           git commit -m "ci: build log for run $GITHUB_RUN_ID" --no-verify || echo "nothing to commit"
           git push -f origin "$LOG_BRANCH" && echo "pushed log to $LOG_BRANCH"
 
-      - name: Diagnose failure (if the build failed)
-        if: failure()
-        run: |
-          echo "::error::Gradle failed — see the AiHub-apk artifact (errors.txt / gradle-debug.log)"
-          sed -n '/What went wrong/,/^\*/p' gradle-debug.log 2>/dev/null | head -40 || true
-          grep -iE 'Could not (find|resolve)|Unsupported class|requires Gradle|SDK location|license' gradle-debug.log 2>/dev/null | head -20 || true
-
-      - name: Publish APK to the "builds" release
-        if: github.event_name == 'push' && success()
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          set -euo pipefail
-          tag=builds
-          gh release view "$tag" >/dev/null 2>&1 || gh release create "$tag" \
-            --title "Ai'sHub builds" \
-            --notes "Installable APKs built automatically from \`$GITHUB_REF_NAME\`.
-
-          **Package:** \`com.aishub\` · **App:** Ai'sHub
-
-          Download the APK, allow install from unknown sources, open it. No account needed; the app works offline." 
-          shopt -s nullglob
-          apks=(out/*.apk)
-          if [ ${#apks[@]} -eq 0 ]; then echo "::error::No APK produced"; exit 1; fi
-          for f in "${apks[@]}"; do
-            base=$(basename "$f")
-            case "$base" in
-              *release*) name="AisHub-$(node -p "require('./package.json').version")-release.apk" ;;
-              *) name="AisHub-$(node -p "require('./package.json').version")-debug.apk" ;;
-            esac
-            cp "$f" "out/$name"
-            gh release upload "$tag" "out/$name" --clobber
-            echo "uploaded $name"
-          done
-          gh release view "$tag" --json assets -q '.assets[].name'

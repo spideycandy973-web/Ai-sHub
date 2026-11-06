@@ -8,12 +8,21 @@
   --surface-3: #212133;
   --line: #262638;
   --line-soft: #1d1d2c;
-  --text: #f2f3f8;
-  --text-2: #a9adc0;
-  --text-3: #6d7188;
+  --text: #f4f5fa;
+  --text-2: #c2c6d8;
+  --text-3: #9aa0b8;
+  /* surfaces that used to be hardcoded dark: they must follow the theme, or the
+     light theme paints near-black text on a dark bar and the app looks blank */
+  --bar-top: rgba(7, 7, 11, 0.94);
+  --bar-fade: rgba(7, 7, 11, 0.6);
+  --chip-bg: rgba(18, 18, 31, 0.9);
+  --overlay: rgba(4, 4, 10, 0.66);
   --brand: #7c5cff;
   --brand-2: #22d3ee;
   --brand-3: #ff7ab6;
+  /* text that is not plain white/black: headings, emphasis, links */
+  --heading: #c3b0ff;
+  --accent: #22d3ee;
   --brand-grad: linear-gradient(135deg, #6d5bff 0%, #a855f7 45%, #22d3ee 100%);
   --ok: #34d399;
   --warn: #fbbf24;
@@ -39,10 +48,99 @@ html[data-theme="light"] {
   --surface-3: #e8e8f2;
   --line: #e2e2ee;
   --line-soft: #ededf5;
-  --text: #14141f;
-  --text-2: #555873;
-  --text-3: #8a8da3;
+  --text: #0e0e18;
+  --text-2: #3f4260;
+  --text-3: #63667f;
+  --bar-top: rgba(255, 255, 255, 0.96);
+  --bar-fade: rgba(255, 255, 255, 0.66);
+  --chip-bg: rgba(255, 255, 255, 0.92);
+  --overlay: rgba(14, 14, 34, 0.42);
+  --heading: #4b2fd6;
+  --accent: #0e7490;
+  --brand: #5b3df5;
+  --brand-2: #0e7490;
   --shadow: 0 12px 34px -20px rgba(20, 20, 60, 0.45);
+}
+
+/* ── Aurora: deep teal, mint text, emerald headings ──────────────────────── */
+html[data-theme="aurora"] {
+  --bg: #04120f;
+  --bg-2: #061a16;
+  --bg-3: #0a231d;
+  --surface: #0a231d;
+  --surface-2: #0e2c25;
+  --surface-3: #143a31;
+  --line: #1c4c40;
+  --line-soft: #123329;
+  --text: #e9fff8;
+  --text-2: #aae5d5;
+  --text-3: #7dbfae;
+  --heading: #4ade80;
+  --accent: #38e8d0;
+  --brand: #10b981;
+  --brand-2: #38e8d0;
+  --brand-3: #a3e635;
+  --brand-grad: linear-gradient(135deg, #059669 0%, #22d3ee 100%);
+  --user-bubble: linear-gradient(135deg, #047857 0%, #0891b2 100%);
+  --bar-top: rgba(4, 18, 15, 0.94);
+  --bar-fade: rgba(4, 18, 15, 0.6);
+  --chip-bg: rgba(10, 35, 29, 0.9);
+  --overlay: rgba(2, 10, 8, 0.66);
+  --shadow: 0 12px 40px -18px rgba(0, 0, 0, 0.85);
+}
+
+/* ── Sunset: warm charcoal, peach text, amber headings ───────────────────── */
+html[data-theme="sunset"] {
+  --bg: #150b0a;
+  --bg-2: #1d100e;
+  --bg-3: #261514;
+  --surface: #261514;
+  --surface-2: #321b18;
+  --surface-3: #40231f;
+  --line: #4f2c26;
+  --line-soft: #3a201c;
+  --text: #ffece3;
+  --text-2: #f3c3ae;
+  --text-3: #cf9a86;
+  --heading: #ffab73;
+  --accent: #ff8fc7;
+  --brand: #f97316;
+  --brand-2: #ff8fc7;
+  --brand-3: #fbbf24;
+  --brand-grad: linear-gradient(135deg, #f97316 0%, #ff7ab6 100%);
+  --user-bubble: linear-gradient(135deg, #c2410c 0%, #be185d 100%);
+  --bar-top: rgba(21, 11, 10, 0.94);
+  --bar-fade: rgba(21, 11, 10, 0.6);
+  --chip-bg: rgba(38, 21, 20, 0.9);
+  --overlay: rgba(10, 5, 5, 0.68);
+  --shadow: 0 12px 40px -18px rgba(0, 0, 0, 0.85);
+}
+
+/* ── Neon: violet night, lilac text, magenta headings ────────────────────── */
+html[data-theme="neon"] {
+  --bg: #0b0413;
+  --bg-2: #12061d;
+  --bg-3: #1a0a28;
+  --surface: #1a0a28;
+  --surface-2: #24102f;
+  --surface-3: #2f1540;
+  --line: #3d1c52;
+  --line-soft: #2b1239;
+  --text: #fdf2ff;
+  --text-2: #dcc0ee;
+  --text-3: #b294c6;
+  --heading: #f472ff;
+  --accent: #22d3ee;
+  --brand: #a855f7;
+  --brand-2: #22d3ee;
+  --brand-3: #f472ff;
+  --brand-grad: linear-gradient(135deg, #a855f7 0%, #22d3ee 100%);
+  --user-bubble: linear-gradient(135deg, #7e22ce 0%, #0891b2 100%);
+  --bar-top: rgba(11, 4, 19, 0.94);
+  --bar-fade: rgba(11, 4, 19, 0.6);
+  --chip-bg: rgba(26, 10, 40, 0.9);
+  --overlay: rgba(6, 2, 10, 0.7);
+  --shadow: 0 12px 40px -18px rgba(0, 0, 0, 0.85);
 }
 
 * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
@@ -71,9 +169,9 @@ html[data-theme="light"] body::before { opacity: 0.55; }
 button, input, textarea, select { font: inherit; color: inherit; }
 button { border: 0; background: none; cursor: pointer; padding: 0; }
 input, textarea, select { outline: none; }
-a { color: var(--brand-2); text-decoration: none; }
+a { color: var(--accent); text-decoration: none; }
 svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; }
-h1, h2, h3, h4 { margin: 0; font-weight: 700; letter-spacing: -0.02em; }
+h1, h2, h3, h4 { margin: 0; font-weight: 700; letter-spacing: -0.02em; color: var(--heading); }
 p { margin: 0; }
 ::selection { background: rgba(124, 92, 255, 0.35); }
 
@@ -204,6 +302,12 @@ textarea.input { height: auto; min-height: 84px; padding: 11px 13px; resize: ver
 .hstack { display: flex; align-items: center; gap: 10px; }
 .vstack { display: flex; flex-direction: column; gap: 10px; }
 .spacer { flex: 1; }
+/* The `hidden` attribute must always win. Without this rule any class that sets
+   `display` (the drawer is display:flex, the backdrops are fixed overlays) stays on
+   screen forever: a permanently visible backdrop swallows every tap and the drawer
+   paints OVER modals, which looks exactly like a frozen, unresponsive app. */
+[hidden] { display: none !important; }
+
 .hidden { display: none !important; }
 
 /* ═════════════ toast ═════════════ */
@@ -229,7 +333,7 @@ textarea.input { height: auto; min-height: 84px; padding: 11px 13px; resize: ver
 
 /* ═════════════ modal ═════════════ */
 .modal-backdrop, .sheet-backdrop, .drawer-backdrop {
-  position: fixed; inset: 0; background: rgba(4, 4, 10, 0.62);
+  position: fixed; inset: 0; background: var(--overlay);
   backdrop-filter: blur(3px); -webkit-backdrop-filter: blur(3px); z-index: 60;
   animation: fade-in 0.2s var(--ease);
 }

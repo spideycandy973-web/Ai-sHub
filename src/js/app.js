@@ -33,12 +33,33 @@
 
   const media = (query) => (typeof window.matchMedia === 'function' ? window.matchMedia(query) : { matches: false, addEventListener() {}, addListener() {} });
 
+  /* ─────────────── themes ───────────────
+     Each theme is a full palette: background, tinted body text, coloured
+     headings and its own accent. "system" follows the phone and resolves to
+     one of the two base palettes. */
+  const THEMES = [
+    { id: 'dark', label: 'Midnight', swatch: ['#07070b', '#c3b0ff', '#22d3ee'], base: 'dark' },
+    { id: 'light', label: 'Daylight', swatch: ['#f6f6fb', '#4b2fd6', '#0e7490'], base: 'light' },
+    { id: 'aurora', label: 'Aurora', swatch: ['#04120f', '#4ade80', '#38e8d0'], base: 'dark' },
+    { id: 'sunset', label: 'Sunset', swatch: ['#150b0a', '#ffab73', '#ff8fc7'], base: 'dark' },
+    { id: 'neon', label: 'Neon', swatch: ['#0b0413', '#f472ff', '#22d3ee'], base: 'dark' },
+  ];
+  const THEME_IDS = THEMES.map((t) => t.id);
+  const THEME_COLOR = { dark: '#07070B', light: '#f6f6fb', aurora: '#04120f', sunset: '#150b0a', neon: '#0b0413' };
+
   function applyTheme() {
-    const pref = A.settings.get('theme');
-    const dark = pref === 'dark' || (pref === 'system' && media('(prefers-color-scheme: dark)').matches);
-    document.documentElement.setAttribute('data-theme', dark ? 'dark' : 'light');
+    const pref = A.settings.get('theme') || 'system';
+    let theme = pref;
+    if (pref === 'system') theme = media('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+    if (THEME_IDS.indexOf(theme) === -1) theme = 'dark';
+
+    document.documentElement.setAttribute('data-theme', theme);
+    const base = (THEMES.find((t) => t.id === theme) || THEMES[0]).base;
+    document.documentElement.style.colorScheme = base === 'light' ? 'light' : 'dark';
+
     const meta = document.querySelector('meta[name="theme-color"]');
-    if (meta) meta.setAttribute('content', dark ? '#07070B' : '#f6f6fb');
+    if (meta) meta.setAttribute('content', THEME_COLOR[theme] || '#07070B');
+    A.bus?.emit?.('theme:changed', theme);
   }
 
   /** short vibration when the device supports it */
@@ -194,6 +215,19 @@
     if (!('serviceWorker' in navigator)) return;
     if (location.protocol === 'file:') return;
     if (!/^https?:$/.test(location.protocol) && !location.hostname) return;
+
+    // Inside the Android app the shell is packaged in the APK, so a service
+    // worker can only serve a STALE copy of it. Unregister and clear caches so
+    // an installed app always runs the build that shipped with it.
+    const nativeShell = /^https?:$/.test(location.protocol) && Boolean(window.Capacitor);
+    if (nativeShell) {
+      navigator.serviceWorker.getRegistrations?.().then((regs) => regs.forEach((r) => r.unregister())).catch(() => {});
+      if (window.caches?.keys) {
+        caches.keys().then((keys) => keys.filter((k) => k.startsWith('aishub-')).forEach((k) => caches.delete(k))).catch(() => {});
+      }
+      return;
+    }
+
     navigator.serviceWorker
       .register('sw.js')
       .then((reg) => {
@@ -205,8 +239,19 @@
             }
           });
         });
+        // A build that changes the cache name should land immediately; otherwise a
+        // stale shell keeps being served and fixes appear not to have any effect.
+        reg.update?.().catch(() => {});
       })
       .catch((err) => console.warn('[sw]', err.message));
+  }
+
+  /* Show which build is running, so it is obvious when an old copy is cached. */
+  function stampBuild() {
+    const el = document.querySelector('[data-build]');
+    if (!el) return;
+    const build = document.querySelector('meta[name="build"]')?.content || '';
+    el.textContent = build ? `build ${build}` : '';
   }
 
   /* ─────────────── reminders ─────────────── */
@@ -325,31 +370,91 @@
   }
 
   /* ─────────────── start ─────────────── */
+  /* ── boot resilience ────────────────────────────────────────────────
+     The shell must ALWAYS appear. Every stage is isolated, the splash is hidden
+     on a deadline, and a watchdog declares the app ready: previously one
+     hanging mount() or a stalled IndexedDB read kept the splash up forever and
+     left a blank screen with no explanation. */
+  const bootErrors = [];
+  window.AIHUB_BOOT_LOG = bootErrors;
+
+  function note(name, err) {
+    const msg = `${name}: ${(err && err.message) || err}`;
+    bootErrors.push(msg);
+    console.error('[boot]', msg);
+  }
+  function stage(name, fn) {
+    window.AIHUB_STAGE = name;
+    try {
+      return fn();
+    } catch (err) {
+      note(name, err);
+      return undefined;
+    }
+  }
+  async function stageAsync(name, fn) {
+    window.AIHUB_STAGE = name;
+    try {
+      return await fn();
+    } catch (err) {
+      note(name, err);
+      return undefined;
+    }
+  }
+  function hideSplash() {
+    const splash = document.getElementById('splash');
+    if (!splash) return;
+    splash.classList.add('is-gone');
+    setTimeout(() => {
+      if (splash.parentNode) splash.parentNode.removeChild(splash);
+    }, 700);
+  }
+
+  let bootWatchdog = null;
+
   async function start() {
-    applyTheme();
-    A.i18n.init();
-    A.chat.cache();
-    wire();
-    A.screens.models.mount();
-    A.screens.agent.mount();
-    A.screens.prompts.mount();
-    A.screens.settings.mount();
+    // Hide the shell even if a stage hangs: a splash that never leaves is
+    // indistinguishable from a frozen app.
+    const splashDeadline = setTimeout(() => {
+      hideSplash();
+      if (!window.AIHUB_BOOTED) window.AIHUB_STAGE = `${window.AIHUB_STAGE || 'start'} (slow)`;
+    }, 2200);
 
-    // restore last chat
-    const lastId = A.settings.get('lastChatId');
-    if (lastId && A.chatStore.get(lastId)) await A.chat.openChat(lastId);
-    else await A.chat.newChat({ silent: true });
+    // Last resort: if the app has not finished by now, show what we have.
+    bootWatchdog = setTimeout(() => {
+      hideSplash();
+      stage('watchdog-render', () => go('chat'));
+      if (!window.AIHUB_BOOTED && document.querySelector('.composer-wrap')) {
+        window.AIHUB_BOOTED = true;
+        document.documentElement.setAttribute('data-boot', 'ready');
+      }
+    }, 6000);
 
-    go('chat');
-    updateModelChip();
-    updateNetLabel();
-    initReminders();
-    registerSW();
+    stage('theme', applyTheme);
+    stage('i18n', () => A.i18n.init());
+    stage('chat-cache', () => A.chat.cache());
+    stage('wire', wire);
+    stage('mount-models', () => A.screens.models.mount());
+    stage('mount-agent', () => A.screens.agent.mount());
+    stage('mount-prompts', () => A.screens.prompts.mount());
+    stage('mount-settings', () => A.screens.settings.mount());
 
-    // splash out
-    const splash = $('#splash');
-    setTimeout(() => splash.classList.add('is-gone'), 260);
-    setTimeout(() => splash.remove(), 900);
+    // restore last chat — never fatal, a broken store must not hide the app
+    await stageAsync('restore-chat', async () => {
+      const lastId = A.settings.get('lastChatId');
+      if (lastId && A.chatStore.get(lastId)) await A.chat.openChat(lastId);
+      else await A.chat.newChat({ silent: true });
+    });
+
+    stage('home', () => go('chat'));
+    stage('chip', () => updateModelChip());
+    stage('net', () => updateNetLabel());
+    stage('reminders', () => initReminders());
+    stage('service-worker', () => registerSW());
+    stage('stamp', () => stampBuild());
+
+    clearTimeout(splashDeadline);
+    hideSplash();
 
     // first-run + auto sync
     setTimeout(() => firstRun(), 700);
@@ -404,10 +509,16 @@
     document.addEventListener('visibilitychange', () => {
       if (!document.hidden && A.discovery.shouldAutoSync()) A.discovery.syncAll({}).catch(() => {});
     });
+    // Boot finished: the guard in index.html stops watching for a blank screen.
+    if (bootWatchdog) clearTimeout(bootWatchdog);
+    if (bootErrors.length) console.warn('[boot] finished with problems:', bootErrors.join(' | '));
+    window.AIHUB_BOOTED = true;
+    document.documentElement.setAttribute('data-boot', 'ready');
   }
 
   A.app = {
     go,
+    themes: () => THEMES.slice(),
     haptic,
     start,
     applyTheme,

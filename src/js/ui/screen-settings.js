@@ -94,6 +94,32 @@
       ${group(
         'Data',
         `<div class="switch-row">
+      </section>
+
+      <!-- ══ phone control ══ -->
+      <section class="group">
+        <h2 class="group-title">Phone control</h2>
+        <div class="card" style="padding:14px">
+          <div class="vstack" style="gap:10px">
+            <div class="hstack" style="gap:10px">
+              <span class="sg-ico" style="width:30px;height:30px;border-radius:10px;background:rgba(124,92,255,.16);color:#c4b5fd;display:grid;place-items:center">${icon('bolt')}</span>
+              <div><div style="font-size:13px;font-weight:650">Let the assistant use this phone</div>
+              <div class="small muted">Alarms, calendar, apps, flashlight, screen taps — free and on-device.</div></div>
+            </div>
+            <div class="small muted" id="phone-status">Checking…</div>
+            <div class="hstack" style="gap:8px;flex-wrap:wrap">
+              <button class="btn btn-ghost btn-sm" id="btn-phone-check">Run self-test</button>
+              <button class="btn btn-ghost btn-sm" id="btn-phone-access">Screen control</button>
+              <button class="btn btn-ghost btn-sm" id="btn-phone-log">Activity</button>
+            </div>
+            <div class="small muted">Try in Chat: “set an alarm for 7:30”, “open youtube”, “text 01712345678 I'm late”.</div>
+          </div>
+        </div>
+      </section>
+
+      <section class="group">
+        <h2 class="group-title">Data</h2>
+        <div class="switch-row">
            <div><div class="label">Export everything</div><div class="sub">Chats, settings and notes as JSON.</div></div>
            <button class="btn btn-ghost btn-sm" id="btn-export">Export</button>
          </div>
@@ -118,7 +144,7 @@
         <img src="logo.png" width="64" height="64" alt="Ai'sHub logo" />
         <div style="font-weight:800;font-size:17px">Ai'sHub</div>
         <div class="small muted" style="margin-top:4px">Your free AI agent — 100+ models, offline engine.</div>
-        <div class="ver" style="margin-top:8px">v${A.VERSION} · build ${A.BUILD} · pkg com.aishub</div>
+        <div class="ver" style="margin-top:8px">v${A.VERSION} · <span data-build>build ${A.BUILD}</span> · pkg com.aishub</div>
         <div class="about-links">
           <a class="btn btn-ghost btn-sm" href="https://github.com/spideycandy973-web/Ai-sHub" target="_blank" rel="noopener">GitHub</a>
           <button class="btn btn-ghost btn-sm" id="btn-about-more">How it works</button>
@@ -194,6 +220,19 @@
       })
     );
 
+    /* ── brain: cloud first or on-device only ── */
+    tempHost.querySelector('#temp-card').appendChild(
+      A.ui.switchRow({
+        label: 'Cloud model when online',
+        sub: 'A real model answers first; the on-device engine takes over if the network fails.',
+        checked: s.get('autoCloud') !== false,
+        onChange: (v) => {
+          s.set('autoCloud', v, { silent: true });
+          toast(v ? 'Cloud model first' : 'On-device engine only', 'ok', 1600);
+        },
+      })
+    );
+
     /* ── agent steps ── */
     const stepsHost = host.querySelector('#steps-host');
     stepsHost.className = 'setting-group';
@@ -206,17 +245,37 @@
       })
     );
 
-    /* ── theme ── */
-    host.querySelector('#theme-host').appendChild(
-      A.ui.segmented(
-        [{ value: 'dark', label: 'Dark' }, { value: 'light', label: 'Light' }, { value: 'system', label: 'System' }],
-        s.get('theme'),
-        (v) => {
-          s.set('theme', v);
+    /* ── theme: real palettes with visible swatches ── */
+    const themeHost = host.querySelector('#theme-host');
+    if (themeHost) {
+      themeHost.innerHTML = '';
+      const grid = document.createElement('div');
+      grid.className = 'theme-grid';
+
+      const chips = [];
+      const themes = A.app.themes();
+      const options = [{ id: 'system', label: 'Follow phone', swatch: ['#5b5b6b', '#9aa0b8', '#22d3ee'] }].concat(themes);
+
+      options.forEach((t) => {
+        const chip = document.createElement('button');
+        chip.className = 'theme-chip';
+        chip.type = 'button';
+        chip.setAttribute('aria-pressed', 'false');
+        chip.innerHTML = `<span class="theme-swatch" style="background:linear-gradient(135deg, ${t.swatch[0]} 0 50%, ${t.swatch[1]} 50% 75%, ${t.swatch[2]} 75% 100%)"></span>${A.util.escapeHtml(t.label)}`;
+        chip.addEventListener('click', () => {
+          s.set('theme', t.id);
           A.app.applyTheme();
-        }
-      )
-    );
+          chips.forEach((c) => c.setAttribute('aria-pressed', String(c === chip)));
+          toast(`${t.label} theme`, 'ok', 1200);
+        });
+        chips.push(chip);
+        grid.appendChild(chip);
+      });
+
+      const current = s.get('theme') || 'system';
+      chips.forEach((c, i) => c.setAttribute('aria-pressed', String(options[i].id === current)));
+      themeHost.appendChild(grid);
+    }
 
     /* ── locale ── */
     host.querySelector('#locale-host').appendChild(
@@ -245,6 +304,116 @@
     host.querySelector('#btn-export').addEventListener('click', exportAll);
     host.querySelector('#btn-import').addEventListener('click', importBackup);
     host.querySelector('#btn-install').addEventListener('click', () => A.app.installPrompt());
+
+    /* ── phone control ── */
+    const phoneStatus = host.querySelector('#phone-status');
+    const describePhone = async () => {
+      if (!phoneStatus) return;
+      if (!A.phone.available()) {
+        phoneStatus.innerHTML = 'Phone control needs the <strong>Android app</strong>. In this browser it stays read-only.';
+        return;
+      }
+      const cap = await A.phone.capabilities();
+      const on = Object.entries(cap.features || {}).filter(([, v]) => v).map(([k]) => k);
+      phoneStatus.innerHTML = `${cap.model || 'This phone'} · Android ${cap.androidVersion || '?'} — <strong>${on.length} capabilities</strong> active${cap.features?.accessibilityClicks ? '' : ' · screen taps need the accessibility switch'}`;
+    };
+    describePhone();
+
+    /* A self-test that names the exact failing step, so "it does not work" becomes
+       "step 4 failed because of X" in one press. */
+    const runSelfTest = async () => {
+      const rows = [];
+      const step = async (label, fn) => {
+        try {
+          const detail = await fn();
+          rows.push({ ok: true, label, detail: detail || '' });
+        } catch (err) {
+          rows.push({ ok: false, label, detail: err && err.message ? err.message : String(err) });
+        }
+      };
+
+      if (!A.phone.available()) {
+        openSheet('Phone self-test', `<div class="card" style="padding:14px">
+          <p class="small"><strong>This is the browser build.</strong> Phone control only exists inside the Android app.</p>
+          <p class="small muted">Install <code>AisHub-1.0.0-release.apk</code> from the repo's <em>builds</em> release, then open Ai'sHub from your app drawer — not from Chrome.</p>
+        </div>`);
+        return;
+      }
+
+      await step('Native plugin loaded', async () => {
+        if (!A.phone.available()) throw new Error('PhoneControl plugin is not registered in this build');
+        return 'PhoneControl found';
+      });
+      await step('Plugin answers (capabilities)', async () => {
+        const cap = await A.phone.capabilities();
+        if (cap.error) throw new Error(cap.error);
+        const on = Object.entries(cap.features || {}).filter(([, v]) => v).map(([k]) => k);
+        if (!on.length) throw new Error('plugin replied but reports no capabilities');
+        return `${cap.model || 'this phone'} · Android ${cap.androidVersion || '?'} · ${on.length} on`;
+      });
+      await step('Device status (battery / volume / storage)', async () => {
+        const st = await A.phone.call('status', {});
+        const bits = [];
+        if (typeof st.battery === 'number') bits.push(`${st.battery}% battery`);
+        if (st.storage) bits.push(`${st.storage}`);
+        if (!bits.length) throw new Error('status returned nothing useful');
+        return bits.join(' · ');
+      });
+      await step('Installed apps readable', async () => {
+        const apps = await A.phone.call('listApps', {});
+        const n = (apps.apps || []).length;
+        if (!n) throw new Error('no launchable apps returned');
+        return `${n} apps`;
+      });
+      await step('Alarm / timer intent reachable', async () => {
+        const cap = await A.phone.capabilities();
+        const ok = cap.features && (cap.features.alarms || cap.features.timers);
+        if (!ok) throw new Error('no clock app on this phone accepts alarms');
+        return 'a clock app will take them';
+      });
+      await step('Accessibility (screen taps)', async () => {
+        const st = await A.phone.call('accessibilityStatus', {});
+        if (!st.enabled) throw new Error('off — tap “Screen control” below to turn it on');
+        return 'enabled';
+      });
+      await step('Last stored request', async () => {
+        const h = A.phoneActions.history();
+        if (!h.length) return 'none yet';
+        const last = h[0];
+        return `${last.action || '?'} — ${last.ok ? 'worked' : 'failed'}`;
+      });
+
+      const passed = rows.filter((r) => r.ok).length;
+      const body = `<div class="card" style="padding:14px">
+        <p class="small"><strong>${passed}/${rows.length} checks passed</strong></p>
+        <div class="vstack" style="gap:10px">${rows.map((r) => `<div class="small">
+          <span class="${r.ok ? 'ok' : 'warn'}">${r.ok ? '✓' : '✕'} ${esc(r.label)}</span>
+          ${r.detail ? `<div class="muted">${esc(r.detail)}</div>` : ''}
+        </div>`).join('')}</div>
+        <p class="small muted" style="margin-top:12px">If something is ✕, tell me its exact line and I will fix that step.</p>
+      </div>`;
+      openSheet('Phone self-test', body);
+      if (phoneStatus) phoneStatus.innerHTML = `<strong>${passed}/${rows.length}</strong> checks passed.`;
+    };
+    host.querySelector('#btn-phone-check')?.addEventListener('click', runSelfTest);
+    host.querySelector('#btn-phone-access')?.addEventListener('click', async () => {
+      try {
+        if (!A.phone.available()) throw new Error('Install the Android app to control the phone.');
+        const st = await A.phone.call('accessibilityStatus', {});
+        if (st.enabled) { toast('Screen control is already on', 'ok'); return; }
+        await A.phone.call('openAccessibilitySettings', {});
+        toast('Enable “Ai\'sHub control” in the list', '', 5000);
+      } catch (err) {
+        toast(err.message, 'err', 4000);
+      }
+    });
+    host.querySelector('#btn-phone-log')?.addEventListener('click', () => {
+      const list = A.phoneActions.history();
+      const body = list.length
+        ? `<div class="vstack" style="gap:8px">${list.slice(0, 30).map((h) => `<div class="small"><span class="muted">${new Date(h.ts).toLocaleString()}</span><br><strong>${esc(h.action || '')}</strong> — ${esc(h.request || '')}${h.ok ? '' : `<br><span class="warn">${esc(h.message || 'failed')}</span>`}</div>`).join('')}</div>`
+        : '<p class="small muted">Nothing yet. Ask me to set an alarm or open an app.</p>';
+      openSheet('Phone activity', `<div class="card" style="padding:14px">${body}</div>`);
+    });
     host.querySelector('#btn-clear-chats').addEventListener('click', async () => {
       const ok = await A.ui.confirmDialog('Clear all chats?', 'Every conversation on this device will be deleted. This cannot be undone.', { okLabel: 'Clear', danger: true });
       if (!ok) return;
