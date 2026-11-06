@@ -93,6 +93,19 @@ jobs:
 
       - name: Run the test suite
         run: npm test
+      - name: Stamp the build revision into the APK
+        run: |
+          set -euo pipefail
+          REV=$(git rev-parse --short HEAD)
+          cat > android/app/src/main/res/values/build_info.xml <<EOF
+          <?xml version="1.0" encoding="utf-8"?>
+          <resources>
+              <string name="build_rev" translatable="false">$REV</string>
+          </resources>
+          EOF
+          cat android/app/src/main/res/values/build_info.xml
+          echo "stamped build $REV"
+
       - name: Check Android resources before Gradle runs
         run: |
           # aapt2 aborts the whole build on a single unescaped apostrophe
@@ -269,11 +282,22 @@ jobs:
 
           # And that the accessibility service is declared, otherwise screen taps can never work.
           MANIFEST_DUMP=$("$BT/aapt2" dump xmltree "$APK" --file AndroidManifest.xml 2>&1 || true)
-          echo "$MANIFEST_DUMP" | head -5
-          if echo "$MANIFEST_DUMP" | grep -q 'AiHubAccessibilityService'; then
-            echo "manifest: accessibility service declared"
+          echo "$MANIFEST_DUMP" | head -3
+          case "$MANIFEST_DUMP" in
+            *AiHubAccessibilityService*)
+              echo "manifest: accessibility service declared" ;;
+            *)
+              echo "::error::APK manifest does not declare AiHubAccessibilityService"
+              exit 1 ;;
+          esac
+
+          # The APK must say which commit it was built from, otherwise a screenshot of a
+          # broken app cannot be tied to a build.
+          "$BT/aapt2" dump resources "$APK" > resources.txt 2>/dev/null || true
+          if grep -q 'build_rev' resources.txt; then
+            echo "resources: build revision stamped ($(grep -m1 -A1 'build_rev' resources.txt | tail -1 | tr -d ' '))"
           else
-            echo "::error::APK manifest does not declare AiHubAccessibilityService"
+            echo "::error::APK carries no build_rev resource (cannot identify the running build)"
             exit 1
           fi
 
