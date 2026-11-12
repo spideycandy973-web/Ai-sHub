@@ -119,3 +119,20 @@ User requirement: open app, send message, get reply; no key/account/setup.
 Sanitized live evidence: `zero_setup_live_*.json` in this folder. These are real requests from the
 build environment, not mocks. They do not prove the owner's phone round-trip yet; device update
 verification remains pending until v0.1.1 is installed and used on the phone.
+
+## RELEASE VERIFIED — v0.1.1 (2026-11-13)
+
+| Check | Result |
+|---|---|
+| Commit | e5b42470297079812b4f5cef968d0cb5297ee8a4 (main) |
+| Android CI | run 43323130317 completed success |
+| Release workflow | run 43323129393 completed success |
+| Release | https://github.com/spideycandy973-web/Ai-sHub/releases/tag/v0.1.1 (id 443602279, not draft/prerelease) |
+| Public APK download | HTTP 200, 1,810,454 bytes |
+| SHA-256 | 20a0a688f4853cee36d449db62dacc9815059dff36f2d1a9c4986dd3f0e566ef (matches published .sha256) |
+| Identity | aapt: package com.aishub, versionCode 2, versionName 0.1.1, label Ai'sHub |
+| Signature | apksigner verify OK; cert SHA-256 d48f90a9a51d8da1e22ae4d429b5449918c69a072c2f1d5b84c06c023730a5b4 (same as v0.1.0 → in-place update) |
+| Zero-setup live smoke | Anonymous Pollinations Classic + AI Horde replies recorded above; no user key/account |
+
+Status: **Released + release-asset verified.** Owner-phone v0.1.1 install/update and live chat
+round-trip remain pending until the user installs this APK and sends a message.

@@ -33,8 +33,8 @@ A mocked test never upgrades a feature to "Live integration verified".
 | Keystore-backed key encryption | `SecureVault`, `KeyStore` | AES-GCM envelope; device test pending | Implemented / Device Unverified |
 | SSRF guard for fetches | `UrlGuard` | code; unit test planned | Implemented |
 | Zero-paid enforcement | registry+router+tests | `RouterTest` incl. 402/no-image-route tests | Locally tested |
-| CI tests+lint+APK+identity | `android-ci.yml` | run 43312276332 success | **CI verified** |
-| Signed release + asset verification | release v0.1.0 + API publication | public download SHA-256 match + aapt + apksigner (EVIDENCE.md) | **Released** |
+| CI tests+lint+APK+identity | `android-ci.yml` | run 43323130317 success (v0.1.1) | **CI verified** |
+| Signed release + asset verification | release v0.1.1 + CI publication | public download SHA-256 match + aapt + apksigner (EVIDENCE.md) | **Released** |
 | Bengali localization | strings externalized | translation not started | Planned (honest) |
 | Accessibility | contentDescription on icons, M3 defaults | TalkBack device test pending | Implemented / Device Unverified |
 
