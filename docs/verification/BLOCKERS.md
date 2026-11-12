@@ -1,0 +1,11 @@
+# Blocker Register (2026-11-13)
+
+| # | Blocker | Impact | Verified evidence | Compliant alternative in place | Next action |
+|---|---|---|---|---|---|
+| B1 | No compliant FREE hosted image-generation API | Image Studio AI generation disabled | Official Gemini pricing page (2026-11-13): all image models "Not available" on Free Tier; no other verified free API | Local editing works; honest blocked state in UI | Re-check provider offerings each release; adopt only if genuinely free + terms-compatible |
+| B2 | No general web-search free API (card/paid) | Research limited to Wikipedia + direct article reads | Provider pricing pages; zero-paid policy | Official Wikipedia API + cited synthesis | Investigate official free search programs (e.g., nonprofit/API grants) without cards |
+| B3 | Isolated cloud code-execution runner not wired | Agent cannot run shell/tests in cloud yet | GitHub Actions is CI, not a hardened hostile-code sandbox; no durable job queue without backend | On-device sandboxed file agent + documented CI path | v0.2: agent→GitHub Actions dispatch with approvals, least-privilege tokens |
+| B4 | In-app Google Drive OAuth needs a Google Cloud OAuth client (owner setup) | No in-app Drive browse/upload yet | Google OAuth requires configured client + consent screen | Development-session Drive used only for owner-authorized key backup | Owner creates OAuth client (phone browser); wire AppAuth in v0.2 |
+| B5 | No emulator/KVM in build sandbox | No instrumented UI/device tests | `/dev/kvm` absent; 2 vCPU/2 GB RAM | JVM unit tests + lint + CI build; owner phone smoke test | Add androidTest suite; run on owner device or CI emulator job (public-repo minutes) |
+| B6 | Live provider verification needs user's own free keys | CI cannot prove live routes | Keys are user-owned; no secrets in CI by policy | In-app Live Check + first-use verification, honest "Unverified" labels | Owner adds free keys on phone; run dashboard Live Check |
+| B7 | GitHub repo did not exist at session start; no GitHub connector in environment | Push/release required owner authorization | Repo 404 + connector list | Official device flow authorized by owner; repo created public per owner choice | None — resolved this session (see EVIDENCE.md) |
