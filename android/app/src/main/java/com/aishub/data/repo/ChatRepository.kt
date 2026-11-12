@@ -138,12 +138,13 @@ class ChatRepository(
                 }
                 emit("switched:${route.displayName}")
             }
-            val key = keys.get(route.provider)
-            if (key == null) {
+            val maybeKey = if (route.requiresUserKey) keys.get(route.provider) else ""
+            if (route.requiresUserKey && maybeKey == null) {
                 excluded += route.id
                 lastError = ProviderError.MissingKey("No key for ${route.provider.displayName}")
                 continue
             }
+            val key = maybeKey ?: ""
             dao.insertMessage(
                 MessageEntity(assistantId, cid, "assistant", "", System.currentTimeMillis(),
                     routeId = route.id, status = "streaming")
@@ -239,6 +240,8 @@ class ChatRepository(
 
     companion object {
         fun defaultAdapters(): Map<ProviderId, ProviderAdapter> = mapOf(
+            ProviderId.POLLINATIONS to OpenAiCompatAdapter.pollinations(),
+            ProviderId.AI_HORDE to OpenAiCompatAdapter.aiHorde(),
             ProviderId.GEMINI to GeminiAdapter(),
             ProviderId.GROQ to OpenAiCompatAdapter.groq(),
             ProviderId.OPENROUTER to OpenAiCompatAdapter.openRouter()

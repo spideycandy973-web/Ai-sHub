@@ -75,7 +75,9 @@ fun VoiceScreen(locator: ServiceLocator) {
         scope.launch {
             try {
                 val decision = locator.router.select(Capability.CHAT, null)
-                val key = locator.keys.get(decision.route.provider) ?: error("No provider key — add one in Settings")
+                val key = if (decision.route.requiresUserKey) {
+                    locator.keys.get(decision.route.provider) ?: error("No provider key — add one in Settings")
+                } else ""
                 val adapter = com.aishub.data.repo.ChatRepository.defaultAdapters()[decision.route.provider]!!
                 val result = adapter.generate(
                     decision.route,

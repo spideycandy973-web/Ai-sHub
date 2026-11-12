@@ -1,0 +1,17 @@
+{
+  "provider": "aihorde_models",
+  "url": "https://oai.aihorde.net/v1/chat/completions",
+  "tested_at_utc": "2026-11-12T22:17:18.415118+00:00",
+  "http_status": 200,
+  "elapsed_seconds": 7.08,
+  "model": "koboldcpp/gemma-4-E4B-it",
+  "assistant_content": "Hi!",
+  "usage": {
+    "prompt_tokens": 24,
+    "completion_tokens": 52,
+    "total_tokens": 76,
+    "completion_tokens_details": {
+      "reasoning_tokens": 52
+    }
+  }
+}

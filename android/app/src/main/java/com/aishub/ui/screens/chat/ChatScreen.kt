@@ -87,6 +87,18 @@ fun ChatScreen(locator: ServiceLocator, conversationId: String) {
                 Text(it, Modifier.padding(12.dp), style = MaterialTheme.typography.bodySmall)
             }
         }
+        if (messages.isEmpty()) {
+            Card(
+                Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+            ) {
+                Text(
+                    "Just type and send. Ai'sHub uses free no-signup AI routes automatically. " +
+                        "If the first service is busy, it tries another free route. Prompts leave this device; do not send passwords or sensitive data.",
+                    Modifier.padding(12.dp), style = MaterialTheme.typography.bodySmall
+                )
+            }
+        }
         LazyColumn(
             state = listState,
             modifier = Modifier.weight(1f).fillMaxWidth(),
@@ -107,7 +119,7 @@ fun ChatScreen(locator: ServiceLocator, conversationId: String) {
             OutlinedTextField(
                 value = input, onValueChange = { input = it },
                 modifier = Modifier.weight(1f),
-                placeholder = { Text("Message (free models only)") },
+                placeholder = { Text("Message Ai'sHub — no setup needed") },
                 maxLines = 5
             )
             if (sending) {

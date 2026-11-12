@@ -10,7 +10,17 @@ Verification date: **2026-11-13**. Re-verify at least every 30 days (router fail
   first real request / dashboard "Live check" — the app never claims a route is live-verified
   until that user's request actually succeeded.
 
-## Text/chat routes (all VERIFIED_FREE, documented)
+## Zero-setup text/chat routes (default, no user key)
+
+| Route | Model ID | Evidence (2026-11-13) | Documented limits |
+|---|---|---|---|
+| Pollinations Classic (no setup) | `openai-fast` (served as GPT-OSS 20B) | Official Classic APIDOCS: free/no-signup; live anonymous POST `/openai` returned a real reply | Anonymous, one text request at a time per IP, at least 30s apart; HTTP 402 + Retry-After when the free slot is not ready; best effort |
+| AI Horde auto (no setup) | `auto` → up to 5 online text models via official `models` array | Official OpenAI-compatible front docs: anonymous access; live anonymous POST with **no Authorization header** returned a real reply | Volunteer workers, lowest queue priority, model list changes, may wait or be unavailable under load |
+
+Live smoke evidence is in `docs/verification/EVIDENCE.md` and `docs/verification/zero_setup_live_*.json`.
+These are real anonymous requests, not mocked. They do not guarantee future uptime or quota.
+
+## Optional keyed text/chat routes (all VERIFIED_FREE, documented)
 
 | Route | Model ID | Evidence (fetched 2026-11-13) | Documented limits |
 |---|---|---|---|
@@ -40,8 +50,8 @@ Verification date: **2026-11-13**. Re-verify at least every 30 days (router fail
 
 Checked 2026-11-13: Gemini image models ("Nano Banana" line incl. 2.5 Flash Image, 3.1 Flash
 Image/Lite Image, Nano Banana 2.1) show **"Not available"** in the Free Tier column of the
-official pricing page. No other compliant free hosted image API was verified. Pollinations-style
-services were not adopted: terms/legitimacy for app integration unverified.
+official pricing page. No other compliant free hosted image API was verified. Pollinations Classic **text** is now adopted for zero-setup chat after official docs + live anonymous verification.
+Pollinations image generation is still not adopted as a verified free image route for this app.
 **Result: no IMAGE_GEN cloud route exists. Image Studio shows the verified limitation and keeps
 local editing. Nothing is faked.**
 
@@ -53,7 +63,7 @@ it plus direct HTTPS reads of the articles it cites.
 
 ## Keys
 
-Users create their own free keys:
+**Not required for normal chat.** Optional advanced users may create their own free keys:
 - Gemini: aistudio.google.com/api-keys (free tier, no card)
 - Groq: console.groq.com/keys (free plan, no card)
 - OpenRouter: openrouter.ai/settings/keys (free models, no purchase)

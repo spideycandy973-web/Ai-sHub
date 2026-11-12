@@ -16,20 +16,30 @@ import org.junit.Test
 /**
  * Routing policy tests. These run against the real registry with injected clock/keys.
  * They are policy tests, NOT live provider verification.
+ *
+ * v0.1.1 policy: normal chat is zero-setup. Anonymous VERIFIED_FREE routes are eligible
+ * without any user key. Optional BYOK routes remain available only when their key exists.
+ * Fail-closed still applies to stale/unverified/free-eligibility and cooldowns.
  */
 class RouterTest {
     private val now = java.time.LocalDate.parse(FreeModelRegistry.VERIFICATION_DATE)
         .atStartOfDay(java.time.ZoneOffset.UTC).toInstant().toEpochMilli() + 3_600_000
 
     @Test
-    fun `no key means no eligible route - fails closed`() = runTest {
+    fun `zero setup - no user keys still selects an anonymous free chat route`() = runTest {
         val router = ModelRouter(keyPresence = { false }, now = { now })
-        try {
-            router.select(Capability.CHAT, null)
-            fail("Expected NoEligibleRoute")
-        } catch (e: ProviderError.NoEligibleRoute) {
-            assertTrue(e.message!!.contains("free"))
-        }
+        val decision = router.select(Capability.CHAT, null)
+        assertEquals(ProviderId.POLLINATIONS, decision.route.provider)
+        assertTrue(!decision.route.requiresUserKey)
+    }
+
+    @Test
+    fun `zero setup - anonymous fallback is used when first anonymous route cools down`() = runTest {
+        val router = ModelRouter(keyPresence = { false }, now = { now })
+        router.recordFailure("pollinations-openai-fast", ProviderError.RateLimited("free slot wait", 31))
+        val decision = router.select(Capability.CHAT, null)
+        assertEquals(ProviderId.AI_HORDE, decision.route.provider)
+        assertTrue(!decision.route.requiresUserKey)
     }
 
     @Test
@@ -38,6 +48,14 @@ class RouterTest {
         val decision = router.select(Capability.CHAT, "groq-gpt-oss-120b")
         assertEquals("groq-gpt-oss-120b", decision.route.id)
         assertEquals(null, decision.switchedFrom)
+    }
+
+    @Test
+    fun `optional keyed route without key falls back to zero-setup route with disclosure`() = runTest {
+        val router = ModelRouter(keyPresence = { false }, now = { now })
+        val decision = router.select(Capability.CHAT, "groq-gpt-oss-120b")
+        assertEquals("groq-gpt-oss-120b", decision.switchedFrom)
+        assertEquals(ProviderId.POLLINATIONS, decision.route.provider)
     }
 
     @Test
@@ -104,9 +122,22 @@ class RouterTest {
     }
 
     @Test
-    fun `only keyed providers become eligible`() = runTest {
+    fun `optional keys do not remove anonymous routes`() = runTest {
         val router = ModelRouter(keyPresence = { it == ProviderId.GROQ }, now = { now })
         val decision = router.select(Capability.CHAT, null)
-        assertEquals(ProviderId.GROQ, decision.route.provider)
+        // Automatic mode still prefers the first healthy no-setup route.
+        assertEquals(ProviderId.POLLINATIONS, decision.route.provider)
+        val explicit = router.select(Capability.CHAT, "groq-gpt-oss-120b")
+        assertEquals(ProviderId.GROQ, explicit.route.provider)
+    }
+
+    @Test
+    fun `zero-setup routes are marked keyless and have privacy notes`() {
+        val pollinations = FreeModelRegistry.byId("pollinations-openai-fast")!!
+        val horde = FreeModelRegistry.byId("ai-horde-auto")!!
+        assertTrue(!pollinations.requiresUserKey)
+        assertTrue(!horde.requiresUserKey)
+        assertTrue(pollinations.privacyNote.isNotBlank())
+        assertTrue(horde.privacyNote.isNotBlank())
     }
 }

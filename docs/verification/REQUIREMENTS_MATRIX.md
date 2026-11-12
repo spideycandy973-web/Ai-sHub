@@ -1,4 +1,4 @@
-# Requirements → Evidence Matrix (v0.1.0, 2026-11-13)
+# Requirements → Evidence Matrix (v0.1.1, 2026-11-13)
 
 Status vocabulary: Planned / Implemented / Locally tested / CI verified / Live integration verified / Device verified / Released / Blocked / Unverified.
 A mocked test never upgrades a feature to "Live integration verified".
@@ -11,8 +11,9 @@ A mocked test never upgrades a feature to "Live integration verified".
 | Room + DataStore + WorkManager deps | `Database.kt`, `SettingsStore.kt`, catalog | Room schema exported; unit build | Implemented (WorkManager wired as dependency; no scheduled jobs yet — Planned) |
 | Themes light/dark/system persisted | `Theme.kt`, `SettingsStore` | DataStore flow; manual device check pending | Implemented / Device Unverified |
 | 8-module navigation + drawer | `Navigation.kt` | compile; device check pending | Implemented / Device Unverified |
-| Free-only registry + fail-closed routing | `FreeModelRegistry.kt`, `ModelRouter.kt` | `RouterTest` 10 tests | Locally tested |
-| ≥2 free providers real requests | Gemini/Groq/OpenRouter adapters | adapter contract tests (mocked); live per-user key check in app | Implemented; Live verification requires user keys (Unverified in CI) |
+| Free-only registry + fail-closed routing | `FreeModelRegistry.kt`, `ModelRouter.kt` | `RouterTest` 13 tests | Locally tested |
+| Zero-setup chat: no key/account/config | Pollinations Classic + AI Horde anonymous routes; ChatRepository keyless path | 40/40 local tests; live anonymous smoke replies (EVIDENCE.md) | **Live integration verified** (build env); device round-trip pending |
+| ≥2 free providers real requests | Pollinations/Horde anonymous + optional Gemini/Groq/OpenRouter adapters | anonymous live smoke; optional keyed adapter contract tests | Implemented; anonymous live verified, optional keyed live requires user keys |
 | Streaming + attribution | adapters + `ChatRepository` | SSE tests; actualModelId parsed from responses | Locally tested |
 | History/search/rename/pin/archive/delete | `ChatDao`, `ChatListScreen` | compile; UI device test pending | Implemented |
 | Export (no secrets) | `exportConversation` | format documented; unit test planned | Implemented |
@@ -37,7 +38,7 @@ A mocked test never upgrades a feature to "Live integration verified".
 | Bengali localization | strings externalized | translation not started | Planned (honest) |
 | Accessibility | contentDescription on icons, M3 defaults | TalkBack device test pending | Implemented / Device Unverified |
 
-## Explicitly NOT claimed in v0.1.0
+## Explicitly NOT claimed in v0.1.1
 
 Cloud sync, conversation import UI, PDF/document analysis, in-app Drive, agent CI dispatch,
 Bengali translation, instrumented UI test coverage, performance measurements.

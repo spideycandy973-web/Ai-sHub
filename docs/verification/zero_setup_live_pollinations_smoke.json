@@ -1,0 +1,14 @@
+{
+  "provider": "pollinations",
+  "url": "https://text.pollinations.ai/openai",
+  "tested_at_utc": "2026-11-12T22:16:22.268821+00:00",
+  "http_status": 200,
+  "elapsed_seconds": 17.68,
+  "model": "gpt-oss-20b",
+  "assistant_content": "Hey! How's it going?",
+  "usage": {
+    "prompt_tokens": 320,
+    "completion_tokens": 94,
+    "total_tokens": 414
+  }
+}

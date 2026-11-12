@@ -4,10 +4,11 @@
 
 | Suite | Location | Kind | What it proves |
 |---|---|---|---|
-| `RouterTest` (10 tests) | `android/app/src/test/.../RouterTest.kt` | JVM unit, real registry + injected clock/keys | Fail-closed routing, staleness, cooldowns, switching disclosure, no paid/image routes, key gating |
+| `RouterTest` (13 tests) | `android/app/src/test/.../RouterTest.kt` | JVM unit, real registry + injected clock/keys | Zero-setup anonymous routing, optional key gating, fail-closed staleness, cooldowns, switching disclosure, no paid/image routes |
 | `RedactorTest` (5) | `RedactorTest.kt` | JVM unit | Secret redaction for Google/Groq/OpenRouter/GitHub/bearer patterns |
 | `SandboxPathsTest` (5) | `SandboxPathsTest.kt` | JVM unit | Traversal, absolute-path, nested traversal, symlink-escape rejection |
 | `ProviderAdapterTest` (10) | `ProviderAdapterTest.kt` | JVM unit + MockWebServer | Request shape, SSE streaming parse, actual-model attribution, error classification (401/402/429/5xx), safety-block handling |
+| `ZeroSetupAdapterTest` (6) | `ZeroSetupAdapterTest.kt` | JVM unit + MockWebServer | Anonymous Pollinations/Horde requests send no Authorization header, Classic 402 is a free-slot wait, Horde online-model selection, reasoning fields are not shown |
 
 **These are mocked/policy tests.** They verify logic, not live provider availability.
 
@@ -28,11 +29,12 @@ every push and uploads reports as artifacts.
 
 ## Live smoke tests (opt-in, bounded)
 
-Live provider verification requires the user's own free keys and happens:
-- in-app: Free AI Access Dashboard → "Live check" (one small real request per tap), or
+Zero-setup routes were live-verified anonymously during development (see EVIDENCE.md). In-app:
+- Free AI Access Dashboard → "Live check" (one small real request per tap), or
 - first real chat/battle/research usage (attributed + recorded in usage log).
 
-No automated live-key tests run in CI (no secrets in CI for providers; zero-quota-waste policy).
+Optional keyed routes still require the user's own free key. No automated live-key tests run in CI
+(no provider secrets in CI; zero-quota-waste policy).
 
 ## Not yet covered (honest)
 

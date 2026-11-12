@@ -8,6 +8,7 @@ enum class Eligibility { VERIFIED_FREE, VERIFIED_LOCAL, UNVERIFIED, REVIEW_REQUI
 enum class Capability { CHAT, CODING, REASONING, VISION, LONG_CONTEXT, TOOLS, IMAGE_GEN, STT, TTS, SEARCH }
 
 enum class ProviderId(val displayName: String) {
+    POLLINATIONS("Pollinations"), AI_HORDE("AI Horde"),
     GEMINI("Google Gemini"), GROQ("Groq"), OPENROUTER("OpenRouter"), LOCAL("On-device")
 }
 

@@ -3,7 +3,8 @@
 **A native Android AI platform built on a strict zero-paid policy.**
 Package: `com.aishub` · Language: Kotlin · UI: Jetpack Compose + Material 3 · Min Android 8.0 (API 26)
 
-> Status: v0.1.0 — first public release. See [Feature status](#feature-status) for exactly what is
+> Status: v0.1.1 — zero-setup chat. Open the app, type a message, get a real AI reply with no API
+> key, account, or configuration. See [Feature status](#feature-status) for exactly what is
 > implemented, tested, and verified vs. blocked. No feature is claimed complete without evidence.
 
 ## What it is
@@ -12,7 +13,7 @@ Ai'sHub combines eight modules in one native app:
 
 | Module | v0.1.0 status |
 |---|---|
-| **AI Chat** | Implemented: streaming chat via Gemini / Groq / OpenRouter free tiers, persistent history, model attribution, pin/archive/delete/search, retry, stop, copy, Markdown + code blocks, JSON export |
+| **AI Chat** | Implemented: **zero-setup streaming chat** via free anonymous Pollinations Classic + AI Horde routes; optional Gemini/Groq/OpenRouter free-tier keys; persistent history, model attribution, pin/archive/delete/search, retry, stop, copy, Markdown + code blocks, JSON export |
 | **AI Agent** | Implemented (on-device scope): model-driven planning + real file tools in an app-private sandbox, 6 modes, supervised approvals, persisted tasks/logs, interruption recovery. Cloud terminal execution: **Blocked** (see AGENT_TOOLS.md) |
 | **AI Battle** | Implemented: same prompt → two independent free models, blind A/B, vote + reveal, persistent history, personal W/L rankings |
 | **Image Studio** | Local editing implemented (rotate/crop/resize, offline). AI generation: **Blocked** — no verified free hosted image API exists as of 2026-11-13; never faked |
@@ -24,12 +25,14 @@ Ai'sHub combines eight modules in one native app:
 Plus: **Free AI Access Dashboard** (verified registry, live health checks, local-only usage counting),
 **Error Center** (redacted, bounded, never auto-uploaded), **Settings** (themes, encrypted keys, privacy wipe).
 
-## Zero-paid policy
+## Zero-setup + zero-paid policy
 
+- **Normal chat needs no account, API key, or setup.** The default routes are free anonymous
+  Pollinations Classic and AI Horde. They are best effort and rate-limited.
 - No paid models, endpoints, subscriptions, or fallbacks exist anywhere in the codebase.
 - Cloud routes fail closed unless `VERIFIED_FREE` **and** verification is < 30 days old.
-- You bring your own **free-tier** API keys (Gemini / Groq / OpenRouter). Keys are encrypted
-  with an Android Keystore-backed AES-GCM vault and never unlock paid routes.
+- Optional advanced BYOK free-tier keys (Gemini / Groq / OpenRouter) are encrypted with an
+  Android Keystore-backed AES-GCM vault and never unlock paid routes.
 - Remaining provider quota is shown as **Unknown** — never invented.
 
 ## Get the app

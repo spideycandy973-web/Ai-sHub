@@ -43,6 +43,7 @@ fun SettingsScreen(locator: ServiceLocator, settings: AppSettings) {
     val keyPresence by locator.keys.presence.collectAsStateWithLifecycle()
     var keyDialogProvider by remember { mutableStateOf<ProviderId?>(null) }
     var routeMenu by remember { mutableStateOf(false) }
+    var showAdvancedKeys by remember { mutableStateOf(false) }
 
     LazyColumn(Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
         item {
@@ -60,15 +61,25 @@ fun SettingsScreen(locator: ServiceLocator, settings: AppSettings) {
             }
         }
         item {
+            InfoCard(
+                "Ready to chat — no setup",
+                "Chat works without an account or API key. Ai'sHub automatically uses free anonymous routes (Pollinations Classic, then AI Horde). " +
+                    "They are best effort and rate-limited; if all are busy, wait and try again. No paid fallback exists."
+            )
+        }
+        item {
             Card(Modifier.fillMaxWidth()) {
                 Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text("Free provider keys", style = MaterialTheme.typography.titleSmall)
+                    Text("Optional advanced keys", style = MaterialTheme.typography.titleSmall)
                     Text(
-                        "Bring your own FREE-tier key. Keys are encrypted with an Android Keystore-backed vault and never leave this device except to the provider you chose. " +
-                            "Only free-verified models are routable — a key can never unlock a paid route in this app.",
+                        "Not required for normal chat. You may optionally add your own FREE-tier key for Gemini, Groq, or OpenRouter. " +
+                            "Keys are encrypted with an Android Keystore-backed vault and never unlock paid routes.",
                         style = MaterialTheme.typography.bodySmall
                     )
-                    listOf(
+                    OutlinedButton(onClick = { showAdvancedKeys = !showAdvancedKeys }) {
+                        Text(if (showAdvancedKeys) "Hide optional keys" else "Show optional keys")
+                    }
+                    if (showAdvancedKeys) listOf(
                         ProviderId.GEMINI to "aistudio.google.com/api-keys",
                         ProviderId.GROQ to "console.groq.com/keys",
                         ProviderId.OPENROUTER to "openrouter.ai/settings/keys"
@@ -93,10 +104,10 @@ fun SettingsScreen(locator: ServiceLocator, settings: AppSettings) {
                 Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text("Chat model", style = MaterialTheme.typography.titleSmall)
                     OutlinedButton(onClick = { routeMenu = true }) {
-                        Text(FreeModelRegistry.byId(settings.preferredChatRoute)?.displayName ?: "Automatic (free routes)")
+                        Text(FreeModelRegistry.byId(settings.preferredChatRoute)?.displayName ?: "Automatic (no-setup free routes)")
                     }
                     DropdownMenu(routeMenu, { routeMenu = false }) {
-                        DropdownMenuItem({ Text("Automatic (free routes)") }, {
+                        DropdownMenuItem({ Text("Automatic (no-setup free routes)") }, {
                             scope.launch { locator.settings.setChatRoute("auto") }; routeMenu = false
                         })
                         FreeModelRegistry.routes.filter { Capability.CHAT in it.capabilities && it.provider != ProviderId.LOCAL }.forEach { r ->
@@ -133,8 +144,9 @@ fun SettingsScreen(locator: ServiceLocator, settings: AppSettings) {
                 Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text("Privacy & data", style = MaterialTheme.typography.titleSmall)
                     Text(
-                        "Conversations, projects, and diagnostics stay on this device. Provider prompts go only to the provider shown on each response. " +
-                            "Free-tier Gemini content may be used by Google to improve products — avoid sensitive data on free tiers.",
+                        "Conversations, projects, and diagnostics stay on this device. When you send a message, its prompt and relevant context go to the AI provider shown on the response. " +
+                            "No-setup routes: Pollinations Classic may cache results; AI Horde volunteer workers can see prompts and the service logs IP/usage data. " +
+                            "Optional free-tier Gemini content may be used by Google to improve products. Avoid sensitive data on all free routes.",
                         style = MaterialTheme.typography.bodySmall
                     )
                     var confirmWipe by remember { mutableStateOf(false) }
@@ -157,7 +169,7 @@ fun SettingsScreen(locator: ServiceLocator, settings: AppSettings) {
             }
         }
         item {
-            InfoCard("About", "Ai'sHub v${com.aishub.BuildConfig.VERSION_NAME} · package com.aishub\nZero-paid policy: no paid models, endpoints, or fallbacks exist in this app. English UI; Bengali-ready resource structure (translation not yet complete).")
+            InfoCard("About", "Ai'sHub v${com.aishub.BuildConfig.VERSION_NAME} · package com.aishub\nZero-setup chat: no account or API key required. Zero-paid policy: no paid models, endpoints, or fallbacks exist in this app. English UI; Bengali-ready resource structure (translation not yet complete).")
         }
     }
 

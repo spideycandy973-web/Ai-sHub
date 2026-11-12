@@ -72,8 +72,10 @@ fun BattleScreen(locator: ServiceLocator) {
                 val req = GenerationRequest(listOf(ChatTurn("user", p)), maxOutputTokens = 1536, temperature = 0.7f)
                 val adapters = com.aishub.data.repo.ChatRepository.defaultAdapters()
                 suspend fun ask(route: com.aishub.domain.ModelRoute): Pair<String?, String?> {
-                    val key = locator.keys.get(route.provider)
-                        ?: return null to "No key for ${route.provider.displayName}"
+                    val key = if (route.requiresUserKey) {
+                        locator.keys.get(route.provider)
+                            ?: return null to "No key for ${route.provider.displayName}"
+                    } else ""
                     return try {
                         val result = adapters[route.provider]!!.generate(route, req, key)
                         locator.router.recordSuccess(route.id)

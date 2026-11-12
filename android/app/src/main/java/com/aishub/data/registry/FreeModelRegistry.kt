@@ -9,6 +9,10 @@ import com.aishub.domain.ProviderId
  * Verified free-model registry.
  *
  * Entries verified 2026-11-13 against official sources:
+ *  - Pollinations Classic (free, no signup, anonymous): https://github.com/pollinations/pollinations/blob/master/APIDOCS.md
+ *    Live anonymous POST https://text.pollinations.ai/openai returned a real GPT-OSS 20B reply.
+ *  - AI Horde OpenAI-compatible front (anonymous volunteer compute): https://haidra-org.github.io/AI-Horde/how-to/send_chat_completions/
+ *    Live anonymous POST https://oai.aihorde.net/v1/chat/completions returned a real reply.
  *  - Gemini pricing: https://ai.google.dev/gemini-api/docs/pricing (fetched live)
  *    gemini-2.5-flash is DEPRECATED (auto-routes to 3.5-flash-lite after 2026-12-01) — excluded.
  *    Image models (Nano Banana line) are paid-only on the API — no free image gen route.
@@ -23,6 +27,34 @@ object FreeModelRegistry {
     const val VERIFICATION_DATE = "2026-11-13"
 
     val routes: List<ModelRoute> = listOf(
+        ModelRoute(
+            id = "pollinations-openai-fast",
+            provider = ProviderId.POLLINATIONS,
+            modelId = "openai-fast",
+            displayName = "Pollinations GPT-OSS 20B (no setup)",
+            capabilities = setOf(Capability.CHAT, Capability.CODING, Capability.REASONING),
+            eligibility = Eligibility.VERIFIED_FREE,
+            verificationSource = "https://github.com/pollinations/pollinations/blob/master/APIDOCS.md",
+            verificationDate = VERIFICATION_DATE,
+            knownLimits = "Free Classic API: anonymous, one text request at a time per IP, at least 30s apart; best effort, no uptime guarantee.",
+            contextWindow = null,
+            privacyNote = "Prompts are sent to Pollinations and its model host. Classic results may be cached; do not send sensitive data.",
+            requiresUserKey = false
+        ),
+        ModelRoute(
+            id = "ai-horde-auto",
+            provider = ProviderId.AI_HORDE,
+            modelId = "auto",
+            displayName = "AI Horde auto (no setup)",
+            capabilities = setOf(Capability.CHAT, Capability.CODING),
+            eligibility = Eligibility.VERIFIED_FREE,
+            verificationSource = "https://haidra-org.github.io/AI-Horde/how-to/send_chat_completions/",
+            verificationDate = VERIFICATION_DATE,
+            knownLimits = "Anonymous volunteer workers; lowest queue priority, model list changes, may wait or be unavailable under load.",
+            contextWindow = null,
+            privacyNote = "Volunteer workers can see prompts; AI Horde logs IP and usage data. Do not send sensitive data.",
+            requiresUserKey = false
+        ),
         ModelRoute(
             id = "gemini-3.5-flash-lite",
             provider = ProviderId.GEMINI,

@@ -80,8 +80,10 @@ class AgentEngine(
 
     suspend fun plan(task: AgentTaskEntity): AgentTaskEntity = withContext(Dispatchers.IO) {
         val decision = router.select(Capability.CODING, null)
-        val key = keys.get(decision.route.provider)
-            ?: error("No API key for ${decision.route.provider.displayName}. Add one in Settings.")
+        val key = if (decision.route.requiresUserKey) {
+            keys.get(decision.route.provider)
+                ?: error("No API key for ${decision.route.provider.displayName}. Add one in Settings.")
+        } else ""
         val adapter = adapters[decision.route.provider] ?: error("No adapter")
         val files = projectDir(task.projectId).walkTopDown().filter { it.isFile }
             .take(50).joinToString("\n") { it.relativeTo(projectDir(task.projectId)).path }
@@ -132,7 +134,9 @@ class AgentEngine(
         val mode = AgentMode.valueOf(task.mode)
         val step = steps[idx]
         val decision = router.select(Capability.CODING, null)
-        val key = keys.get(decision.route.provider) ?: error("Missing provider key")
+        val key = if (decision.route.requiresUserKey) {
+            keys.get(decision.route.provider) ?: error("Missing provider key")
+        } else ""
         val adapter = adapters[decision.route.provider] ?: error("No adapter")
 
         val existing = projectDir(task.projectId).walkTopDown().filter { it.isFile }.take(30)

@@ -65,6 +65,7 @@ fun DashboardScreen(locator: ServiceLocator) {
                             append(route.eligibility.name)
                             if (stale) append(" · STALE — routing disabled")
                             if (route.requiresUserKey) append(if (hasKey) " · key set" else " · no key")
+                            else append(" · no account or key needed")
                             if (inCooldown) append(" · cooldown until ${DateFormat.getTimeInstance(DateFormat.SHORT).format(Date(h!!.cooldownUntilMillis))}")
                         },
                         style = MaterialTheme.typography.labelMedium,
@@ -89,9 +90,9 @@ fun DashboardScreen(locator: ServiceLocator) {
                                 checking = route.id
                                 checkResults[route.id] = "Checking (uses ~1 request)…"
                                 scope.launch {
-                                    val key = locator.keys.get(route.provider)
-                                    val result = if (key == null) Result.failure(IllegalStateException("No key"))
-                                    else adapters[route.provider]!!.healthCheck(route, key)
+                                    val key = if (route.requiresUserKey) locator.keys.get(route.provider) else ""
+                                    val result = if (route.requiresUserKey && key == null) Result.failure(IllegalStateException("No key"))
+                                    else adapters[route.provider]!!.healthCheck(route, key ?: "")
                                     result.onSuccess {
                                         checkResults[route.id] = "✓ Live check passed: ${it.take(50)}"
                                         locator.router.recordSuccess(route.id)

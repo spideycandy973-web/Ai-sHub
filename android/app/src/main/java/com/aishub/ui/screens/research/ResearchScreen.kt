@@ -78,7 +78,9 @@ fun ResearchScreen(locator: ServiceLocator) {
                 }
                 progress = "3/4 Synthesizing with a free model…"
                 val decision = locator.router.select(Capability.REASONING, null)
-                val key = locator.keys.get(decision.route.provider) ?: error("No provider key — add one in Settings")
+                val key = if (decision.route.requiresUserKey) {
+                    locator.keys.get(decision.route.provider) ?: error("No provider key — add one in Settings")
+                } else ""
                 val adapter = com.aishub.data.repo.ChatRepository.defaultAdapters()[decision.route.provider]!!
                 val evidenceText = evidence.mapIndexed { i, (s, text) ->
                     "[Source ${i + 1}] ${s.title} (${s.url})\n${text.take(5000)}"

@@ -68,7 +68,7 @@ fun ChatListScreen(locator: ServiceLocator, openChat: (String) -> Unit) {
             if (filtered.isEmpty()) {
                 EmptyState(
                     "No conversations yet",
-                    "Tap + to start chatting with free AI models.\nAdd a free provider key in Settings first (Gemini, Groq, or OpenRouter)."
+                    "Tap + and type a message. No account, API key, or setup is needed.\nFree public AI services are best effort; avoid sensitive data."
                 )
             } else {
                 LazyColumn(Modifier.fillMaxSize(), contentPadding = androidx.compose.foundation.layout.PaddingValues(16.dp),

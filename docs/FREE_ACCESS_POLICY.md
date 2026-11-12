@@ -10,10 +10,14 @@ implemented in code, not aspirations.
    constructs a paid endpoint. Adding a route requires a code change reviewed against this policy.
 2. **Fail-closed staleness**: `ModelRouter` refuses any route whose verification is older than
    30 days (`STALE_DAYS`). An old app build eventually routes nothing rather than guessing.
-3. **Capability + key filters**: routes require the needed capability and the user's own key.
-4. **Error classification**: HTTP 402 (payment required) and quota-shaped 429s suspend the route
-   (`QuotaExhausted`, 6h cooldown). 401/403 suspends until the user fixes the key. **No retry
-   ever escalates to payment.** Unit tests cover these classifications.
+3. **Capability + key filters**: routes require the needed capability. Zero-setup anonymous
+   routes require no user key; optional BYOK routes require the user's own free-tier key.
+4. **Error classification**: Pollinations Classic HTTP 402 is treated as a free-slot rate limit
+   (`RateLimited`, honoring `Retry-After`) because the official Classic API uses 402 for anonymous
+   spacing. Other HTTP 402 responses are payment/credit refusals (`QuotaExhausted`, 6h cooldown).
+   Quota-shaped 429s suspend the route. 401/403 suspends until the user fixes the key (or, for
+   anonymous routes, until the service changes). **No retry ever escalates to payment.** Unit tests
+   cover these classifications.
 5. **No billing surfaces**: the app contains no purchase UI, no credit top-up links, no paid
    toggles, no "upgrade" fallback. OpenRouter is used only via `openrouter/free` ($0 routes);
    the app never sends paid model IDs.
@@ -30,9 +34,9 @@ implemented in code, not aspirations.
 
 ## Quota exhaustion behavior
 
-Rate limit → cooldown honoring `Retry-After` (default 60s) → try next eligible free route with
-disclosure ("Model switched: now using X") → if none, honest error: "No eligible free route…
-Paid fallbacks do not exist." Conversations and partial outputs are preserved.
+Rate limit → cooldown honoring `Retry-After` → try next eligible free route with disclosure
+("Model switched: now using X") → if none, honest error: "No eligible free route… No account, key,
+or payment is required; paid fallbacks do not exist." Conversations and partial outputs are preserved.
 
 ## Review cadence
 

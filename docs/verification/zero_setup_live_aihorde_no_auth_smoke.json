@@ -1,0 +1,15 @@
+{
+  "provider": "aihorde_no_authorization_header",
+  "url": "https://oai.aihorde.net/v1/chat/completions",
+  "tested_at_utc": "2026-11-12T22:38:07.213965+00:00",
+  "http_status": 200,
+  "elapsed_seconds": 3.36,
+  "authorization_header_sent": false,
+  "model": "koboldcpp/gemma-4-E4B-it",
+  "assistant_content": "Hey there!",
+  "usage": {
+    "prompt_tokens": 18,
+    "completion_tokens": 4,
+    "total_tokens": 22
+  }
+}

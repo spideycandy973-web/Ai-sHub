@@ -13,16 +13,18 @@
 
 | Data | Destination | When |
 |---|---|---|
-| Chat/agent/research prompts + relevant context | The provider shown in the UI (Google/Groq/OpenRouter) | When you send a message, run a task, or run research |
-| Your free API key | Only its own provider | On each request to that provider |
+| Chat/agent/research prompts + relevant context | The provider shown in the UI: Pollinations Classic / AI Horde by default; optional Google/Groq/OpenRouter | When you send a message, run a task, or run research |
+| Your optional free API key | Only its own provider | On each request to that optional keyed provider |
 | Speech audio | Your device's system speech recognizer (which may use its own network service) | When you tap Speak |
 | Research queries | Wikipedia API | When you run research |
 | GitHub token | github.com / api.github.com | When you use Developer Hub |
 
-**Free-tier terms you should know:** Google's Gemini free tier uses content to improve products
-(stated on the official pricing page). Groq/OpenRouter free routes have their own policies;
-some free-model providers train on prompts. The Free AI Access Dashboard shows the privacy note
-for every route. Avoid sensitive personal data on free tiers.
+**Free-route terms you should know:** No-setup chat sends prompts to third-party services.
+Pollinations Classic documents cached results and best-effort service; AI Horde documents that
+volunteer workers can see prompts and that IP/usage data is logged. Google's optional Gemini free
+tier uses content to improve products. Groq/OpenRouter free routes have their own policies; some
+free-model providers train on prompts. The Free AI Access Dashboard shows the privacy note for
+every route. Avoid sensitive personal data on all free routes.
 
 ## Never done
 

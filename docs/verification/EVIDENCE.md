@@ -85,3 +85,37 @@ remaining verification step (docs/releases/INSTALL.md). Status stays **Unverifie
 
 Status: **Released + release-asset verified.** Device install/launch on the owner's phone
 remains the only unverified step (instructions: docs/releases/INSTALL.md).
+
+## DEVICE VERIFIED (partial) — owner's phone, 2026-11-13 04:11 (Asia/Dhaka)
+
+Owner screenshot `Screenshot_2026-11-13-04-11-11-156_com.aishub.jpg` confirms on a physical
+Android device:
+- APK installed and launches (screenshot package: com.aishub)
+- Dark theme renders correctly; Chat screen, message input, bottom navigation
+  (Chat / Agent / Battle / Workspace) all present
+- User message "hi" persisted as a chat bubble
+- Fail-closed router working as designed: with no provider key configured, the request
+  fails honestly with "No eligible free route for CHAT… Paid fallbacks do not exist."
+  and a retry affordance — no crash, no fake response.
+
+Verified on device: install, launch, UI render, message persistence, error handling.
+Still unverified on device: live provider round-trip (owner needs to add a free key),
+voice, agent execution. Next: owner adds free Gemini key → Live check → chat.
+
+
+## ZERO-SETUP LIVE VERIFIED — v0.1.1 development (2026-11-13)
+
+User requirement: open app, send message, get reply; no key/account/setup.
+
+| Check | Result |
+|---|---|
+| Pollinations Classic anonymous non-stream | HTTP 200, model `gpt-oss-20b`, assistant content `Hey! How's it going?`, no user key/account |
+| Pollinations Classic anonymous stream | HTTP 200 SSE, visible content assembled from deltas; reasoning fields ignored by adapter |
+| AI Horde anonymous with public anonymous key | HTTP 200, model `koboldcpp/gemma-4-E4B-it`, assistant content `Hi!` |
+| AI Horde exact adapter shape: **no Authorization header** | HTTP 200, model `koboldcpp/gemma-4-E4B-it`, assistant content `Hey there!`, queue wait ~0.83s |
+| Local unit tests after zero-setup changes | **40/40 pass**, 0 failures/errors/skipped |
+| Local debug build | `:app:assembleDebug` BUILD SUCCESSFUL |
+
+Sanitized live evidence: `zero_setup_live_*.json` in this folder. These are real requests from the
+build environment, not mocks. They do not prove the owner's phone round-trip yet; device update
+verification remains pending until v0.1.1 is installed and used on the phone.

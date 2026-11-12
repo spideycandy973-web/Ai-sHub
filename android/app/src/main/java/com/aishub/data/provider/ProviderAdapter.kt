@@ -19,9 +19,21 @@ interface ProviderAdapter {
     suspend fun healthCheck(route: ModelRoute, apiKey: String): Result<String>
 }
 
-internal fun classifyHttp(code: Int, body: String, retryAfter: String?): ProviderError {
+internal fun classifyHttp(
+    code: Int,
+    body: String,
+    retryAfter: String?,
+    pollinationsClassic: Boolean = false,
+    aiHorde: Boolean = false
+): ProviderError {
     val snippet = body.take(300)
     return when {
+        code == 402 && pollinationsClassic -> ProviderError.RateLimited(
+            "Free anonymous slot is not ready yet (HTTP 402). Wait for Retry-After; no payment is made.",
+            retryAfter?.toLongOrNull() ?: 31L
+        )
+        code == 403 && aiHorde && (snippet.contains("KudosUpfront", true) || snippet.contains("max_kudos", true)) ->
+            ProviderError.QuotaExhausted("AI Horde free allowance refused this request: $snippet")
         code == 401 || code == 403 -> ProviderError.Auth("Authentication failed ($code): $snippet")
         code == 429 -> {
             val isQuota = snippet.contains("quota", true) || snippet.contains("exceeded your current", true)
@@ -31,6 +43,7 @@ internal fun classifyHttp(code: Int, body: String, retryAfter: String?): Provide
         code == 402 -> ProviderError.QuotaExhausted("Provider requires credit balance (402) — route suspended, never pay: $snippet")
         code == 404 -> ProviderError.Unsupported("Model not found or not available ($code): $snippet")
         code == 400 -> ProviderError.Malformed("Bad request ($code): $snippet")
+        code == 408 -> ProviderError.Unavailable("Provider request timeout ($code): $snippet")
         code >= 500 -> ProviderError.Unavailable("Provider server error ($code)")
         else -> ProviderError.Malformed("Unexpected HTTP $code: $snippet")
     }

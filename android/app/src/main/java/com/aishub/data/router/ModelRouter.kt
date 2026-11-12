@@ -29,7 +29,7 @@ data class RoutingDecision(val route: ModelRoute, val switchedFrom: String?, val
  *
  * Hard rules (in order):
  *  1. Only VERIFIED_FREE, non-stale cloud routes (fail closed).
- *  2. Capability + user key availability.
+ *  2. Capability + key availability (public anonymous routes need no user key).
  *  3. Cooldowns from classified errors.
  *  4. Prefer the user's explicit choice; otherwise first healthy route.
  * There is no paid fallback path in this codebase.
@@ -61,8 +61,8 @@ class ModelRouter(
                 .filter { healthFor(it.id).cooldownUntilMillis <= now() }
             if (eligible.isEmpty()) {
                 throw ProviderError.NoEligibleRoute(
-                    "No eligible free route for $capability. Add a free provider key in Settings, " +
-                        "wait for cooldowns, or use offline features. Paid fallbacks do not exist."
+                    "No eligible free route for $capability right now. The no-setup AI services may be busy or in cooldown. " +
+                        "Try again shortly or use offline features. No account, key, or payment is required; paid fallbacks do not exist."
                 )
             }
             val preferred = preferredRouteId?.let { id -> eligible.find { it.id == id } }
