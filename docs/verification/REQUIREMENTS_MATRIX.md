@@ -5,7 +5,7 @@ A mocked test never upgrades a feature to "Live integration verified".
 
 | Requirement | Implementation | Evidence | Status |
 |---|---|---|---|
-| Identity: label Ai'sHub, ID com.aishub | `AndroidManifest.xml`, `build.gradle.kts`, `strings.xml` | aapt badging on built APK (see EVIDENCE.md) | Locally tested → CI verified after push |
+| Identity: label Ai'sHub, ID com.aishub | `AndroidManifest.xml`, `build.gradle.kts`, `strings.xml` | aapt badging on built APK (see EVIDENCE.md) | **CI verified** (run 43312276332) |
 | Native Kotlin + Compose M3, no WebView | entire `ui/` (no WebView import anywhere) | build + code inspection | Implemented |
 | MVVM/Clean boundaries, Coroutines/Flow | `data/`, `domain/`, `ui/` separation; StateFlow/Flow throughout | compile + tests | Implemented |
 | Room + DataStore + WorkManager deps | `Database.kt`, `SettingsStore.kt`, catalog | Room schema exported; unit build | Implemented (WorkManager wired as dependency; no scheduled jobs yet — Planned) |
@@ -32,8 +32,8 @@ A mocked test never upgrades a feature to "Live integration verified".
 | Keystore-backed key encryption | `SecureVault`, `KeyStore` | AES-GCM envelope; device test pending | Implemented / Device Unverified |
 | SSRF guard for fetches | `UrlGuard` | code; unit test planned | Implemented |
 | Zero-paid enforcement | registry+router+tests | `RouterTest` incl. 402/no-image-route tests | Locally tested |
-| CI tests+lint+APK+identity | `android-ci.yml` | first run after push | Planned → CI verified (pending push) |
-| Signed release + asset verification | `release.yml` | run + download + digest evidence | Released (see EVIDENCE.md after publication) |
+| CI tests+lint+APK+identity | `android-ci.yml` | run 43312276332 success | **CI verified** |
+| Signed release + asset verification | release v0.1.0 + API publication | public download SHA-256 match + aapt + apksigner (EVIDENCE.md) | **Released** |
 | Bengali localization | strings externalized | translation not started | Planned (honest) |
 | Accessibility | contentDescription on icons, M3 defaults | TalkBack device test pending | Implemented / Device Unverified |
 
